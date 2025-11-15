@@ -1,0 +1,15 @@
+streamlit
+pandas
+sentence-transformers
+transformers
+torch
+keybert
+beautifulsoup4
+requests
+python-dotenv
+scikit-learn
+numpy
+matplotlib
+seaborn
+accelerate
+tokenizers

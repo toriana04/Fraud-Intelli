@@ -1,0 +1,9 @@
+# Fraud Intelli Dark Mode Theme
+
+[theme]
+base="dark"
+primaryColor="#00F2FF"         # neon cyan accent
+backgroundColor="#0A0F24"      # deep navy background
+secondaryBackgroundColor="#11172B"   # sidebar + cards
+textColor="#FFFFFF"            # bright white text
+font="sans serif"
