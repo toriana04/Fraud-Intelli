@@ -1,235 +1,144 @@
 import streamlit as st
-# ============================================================
-#   FRAUD INTELLI PREMIUM BRAND THEME (FULL DARK MODE)
-# ============================================================
-
-st.markdown("""
-<style>
-
-    /* Global BG */
-    .main, .reportview-container {
-        background-color: #0A0F24 !important;
-        color: #FFFFFF !important;
-    }
-
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #11172B !important;
-        border-right: 1px solid rgba(255,255,255,0.1);
-    }
-    section[data-testid="stSidebar"] * {
-        color: #D6E2FF !important;
-    }
-
-    /* Headers */
-    h1, h2, h3, h4 {
-        color: #00F2FF !important;
-        font-weight: 800 !important;
-    }
-
-    /* Buttons */
-    .stButton>button {
-        background: linear-gradient(90deg, #8A2BE2, #00F2FF);
-        color: white !important;
-        border-radius: 8px;
-        border: none;
-        padding: 0.6rem 1.3rem;
-        font-weight: 700;
-        font-size: 16px;
-    }
-
-    .stButton>button:hover {
-        opacity: 0.85;
-        transform: scale(1.02);
-        transition: 0.2s ease;
-    }
-
-    /* Text Inputs */
-    .stTextInput>div>div>input,
-    .stTextArea textarea,
-    .stSelectbox div[data-baseweb="select"] {
-        background-color: #121A2E;
-        color: white !important;
-        border: 1px solid #8A2BE2 !important;
-        border-radius: 6px;
-    }
-
-    /* Dataframes */
-    .stDataFrame, .dataframe {
-        background-color: #11172B !important;
-        color: white !important;
-    }
-
-    /* Alerts */
-    .stAlert {
-        background-color: rgba(138, 43, 226, 0.15) !important;
-        border-left: 4px solid #8A2BE2 !important;
-        color: #E6D9FF !important;
-    }
-
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 7px; }
-    ::-webkit-scrollbar-thumb {
-        background: #8A2BE2;
-        border-radius: 4px;
-    }
-
-    /* Fraud Intelli Cards */
-    .fraud-card {
-        background-color: #11172B;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #00F2FF;
-        margin-bottom: 15px;
-        color: white;
-    }
-
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================
-#   FRAUD INTELLI ANIMATED LOGO SPINNER  (Glow + Rotate Combo)
-# ============================================================
-
-st.markdown("""
-<style>
-
-@keyframes spinpulse {
-  0% {
-    transform: rotate(0deg) scale(1);
-    filter: drop-shadow(0 0 0 #00F2FF);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.05);
-    filter: drop-shadow(0 0 12px #00F2FF);
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-    filter: drop-shadow(0 0 0 #00F2FF);
-  }
-}
-
-.spinner-premium {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 40px;
-}
-
-.spinner-logo-premium {
-    width: 150px;
-    animation: spinpulse 2.5s infinite ease-in-out;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-def fraud_intelli_spinner(message="Fraud Intelli is analyzing..."):
-    st.markdown(f"""
-        <h4 style='text-align:center; color:#8A2BE2;'>{message}</h4>
-        <div class="spinner-premium">
-            <img src="https://i.imgur.com/kIzoyP2.png" class="spinner-logo-premium">
-        </div>
-    """, unsafe_allow_html=True)
-
-
-import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from transformers import pipeline
-from datetime import datetime
+import plotly.express as px
 
-# ===== BRAND THEME CSS (included as shown above) =====
+# ------------------------------------------------------
+# PAGE CONFIGURATION
+# ------------------------------------------------------
+st.set_page_config(
+    page_title="Fraud Trends",
+    page_icon="📈",
+    layout="wide",
+)
 
-st.image("https://i.imgur.com/kIzoyP2.png", width=140)
-st.markdown("<h1 style='text-align:center;'>📈 Fraud Trends & Evolution</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; opacity:0.8;'>Track how fraud topics develop over time.</p>", unsafe_allow_html=True)
-
-# --- Load Data ---
+# ------------------------------------------------------
+# LOAD DATA
+# ------------------------------------------------------
 @st.cache_data
 def load_data():
     df = pd.read_csv("fraud_analysis_final.csv")
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["month"] = df["date"].dt.to_period("M").astype(str)
+
+    # Convert timestamp into datetime
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+
+    # Extract month + year for trend grouping
+    df["year_month"] = df["timestamp"].dt.to_period("M").astype(str)
+
+    # Parse keyword list
+    df["keyword_list"] = df["keywords"].fillna("").str.split(",")
+    df["keyword_list"] = df["keyword_list"].apply(
+        lambda lst: [k.strip() for k in lst if k.strip()]
+    )
+
     return df
 
 df = load_data()
 
-# --- Fraud Type Classification ---
-def detect_fraud_type(keywords):
-    k = keywords.lower()
-    if "ai" in k: return "AI Fraud"
-    if "check" in k: return "Check Fraud"
-    if "elder" in k or "older" in k: return "Elder Fraud"
-    if "account" in k: return "Account Takeover"
-    if "scam" in k: return "Scams"
-    if "disaster" in k: return "Disaster Fraud"
-    return "General Fraud"
+# ------------------------------------------------------
+# PAGE TITLE
+# ------------------------------------------------------
+st.markdown("""
+<h1 style="text-align:center; color:#04d9ff; font-size:50px; font-weight:800;">
+📈 Fraud Trends & Evolution
+</h1>
+""", unsafe_allow_html=True)
 
-df["fraud_type"] = df["keywords"].fillna("").apply(detect_fraud_type)
+st.markdown("""
+<div style="text-align:center; color:#cccccc; font-size:18px;">
+Track how fraud topics develop over time using keyword trends and article volume.
+</div>
+""", unsafe_allow_html=True)
 
-# --- Filters ---
-st.markdown("### 🔽 Filters")
-fraud_types = ["All"] + sorted(df["fraud_type"].unique())
-selected_type = st.selectbox("Fraud Type:", fraud_types)
+st.write("---")
 
-months = sorted(df["month"].unique())
-start_month = st.selectbox("Start:", months, index=0)
-end_month = st.selectbox("End:", months, index=len(months)-1)
+# ------------------------------------------------------
+# SIDEBAR FILTERS
+# ------------------------------------------------------
+st.sidebar.markdown("## 🔎 Trend Filters")
 
-filtered = df[(df["month"] >= start_month) & (df["month"] <= end_month)]
-if selected_type != "All":
-    filtered = filtered[filtered["fraud_type"] == selected_type]
+# Build keyword set
+all_keywords = sorted({kw for lst in df["keyword_list"] for kw in lst})
 
-# --- Trend Chart ---
-st.markdown("### 📊 Frequency Over Time")
-
-trend = filtered.groupby(["month", "fraud_type"]).size().reset_index(name="count")
-pivot = trend.pivot(index="month", columns="fraud_type", values="count").fillna(0)
-
-fig, ax = plt.subplots(figsize=(10,5))
-colors = ["#00F2FF", "#8A2BE2", "#5EE7FF", "#FF66C4", "#0097A7"]
-pivot.plot(ax=ax, linewidth=2, color=colors[:len(pivot.columns)])
-
-ax.set_facecolor("#0A0F24")
-fig.set_facecolor("#0A0F24")
-plt.xlabel("Month", color="white")
-plt.ylabel("Count", color="white")
-plt.title("Fraud Trends Over Time", color="#00F2FF")
-plt.xticks(color="white", rotation=45)
-plt.yticks(color="white")
-plt.grid(color="#333333", linestyle="--", alpha=0.3)
-
-st.pyplot(fig)
-
-# --- Heatmap ---
-st.markdown("### 🔥 Keyword Heatmap")
-
-kw_split = filtered["keywords"].dropna().apply(lambda x: x.split(","))
-all_kw = [w.strip() for sub in kw_split for w in sub]
-kw_df = pd.DataFrame({"keyword": all_kw})
-top_kw = kw_df["keyword"].value_counts().head(15)
-
-fig2, ax2 = plt.subplots(figsize=(8,3))
-sns.heatmap(
-    top_kw.to_frame().T,
-    cmap=sns.color_palette(["#8A2BE2", "#00F2FF"], as_cmap=True),
-    annot=True, fmt="d", cbar=False, linewidths=1
+selected_keyword = st.sidebar.selectbox(
+    "Select a Fraud Keyword",
+    options=["(All Keywords)"] + all_keywords
 )
-ax2.set_facecolor("#0A0F24")
-plt.title("Keyword Density", color="#00F2FF")
-plt.xticks(color="white", rotation=45)
-plt.yticks(color="white")
 
-st.pyplot(fig2)
+# ------------------------------------------------------
+# TREND: ARTICLE COUNT OVER TIME
+# ------------------------------------------------------
+st.markdown("## 🗓 Article Volume Over Time")
 
-# --- Export ---
-st.markdown("### 💾 Export Data")
-st.download_button(
-    "Download Filtered Data (CSV)",
-    filtered.to_csv(index=False),
-    file_name="filtered_fraud_data.csv",
-    mime="text/csv"
+if selected_keyword == "(All Keywords)":
+    trend_df = (
+        df.groupby("year_month")
+        .size()
+        .reset_index(name="count")
+        .sort_values("year_month")
+    )
+else:
+    trend_df = df[df["keyword_list"].apply(lambda lst: selected_keyword in lst)]
+    trend_df = (
+        trend_df.groupby("year_month")
+        .size()
+        .reset_index(name="count")
+        .sort_values("year_month")
+    )
 
+fig = px.line(
+    trend_df,
+    x="year_month",
+    y="count",
+    markers=True,
+    title=f"Article Trend for: {selected_keyword}",
+    color_discrete_sequence=["#04d9ff"]
 )
+
+fig.update_layout(
+    xaxis_title="Month",
+    yaxis_title="Article Count",
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#FFFFFF"),
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# ------------------------------------------------------
+# TOP TRENDING KEYWORDS (Frequency Over Time)
+# ------------------------------------------------------
+st.markdown("## 🔥 Top Trending Fraud Keywords")
+
+# Flatten keyword + date pairs
+keyword_time_rows = []
+
+for _, row in df.iterrows():
+    for kw in row["keyword_list"]:
+        keyword_time_rows.append({
+            "keyword": kw,
+            "year_month": row["year_month"]
+        })
+
+keyword_time_df = pd.DataFrame(keyword_time_rows)
+
+trend_keyword_freq = (
+    keyword_time_df.groupby(["year_month", "keyword"])
+    .size()
+    .reset_index(name="count")
+)
+
+fig2 = px.line(
+    trend_keyword_freq,
+    x="year_month",
+    y="count",
+    color="keyword",
+    title="Keyword Frequency Over Time",
+)
+
+fig2.update_layout(
+    plot_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#FFFFFF"),
+)
+
+st.plotly_chart(fig2, use_container_width=True)
