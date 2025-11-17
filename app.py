@@ -172,9 +172,9 @@ Fraud Intelli © 2025 — Built with ❤️ by UNC Charlotte SDS Team
 # ------------------------------------------------------
 st.markdown("## 📰 Related Articles")
 
-# Get top 5 (excluding the top one already shown)
+# Get top 5 (excluding the already displayed best match)
 top_k = 5
-related_df = df.sort_values("similarity", ascending=False).iloc[1: top_k + 1]
+related_df = df.sort_values("similarity", ascending=False).iloc[1 : top_k + 1]
 
 if related_df.empty:
     st.info("No related articles found.")
@@ -200,3 +200,7 @@ else:
             </a>
         </div>
         """, unsafe_allow_html=True)
+
+        </div>
+        """, unsafe_allow_html=True)
+
