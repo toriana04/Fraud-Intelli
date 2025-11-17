@@ -240,7 +240,7 @@ if query:
         for s in suggestions:
             if st.button(f"🔎 {s}"):
                 st.session_state.search_text = s
-                st.experimental_rerun()
+                st.rerun()
     st.markdown("<hr>", unsafe_allow_html=True)
 
 # =====================================================================
@@ -348,3 +348,4 @@ A project by Clara Belluci, Troy Benner, Hoang Bui, and Tori-Ana McNeil<br>
 In partnership with the <b>UNCC School of Data Science</b> and <b>USAA</b>.
 </p>
 """, unsafe_allow_html=True)
+
