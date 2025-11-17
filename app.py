@@ -58,7 +58,9 @@ def load_model():
 
 model = load_model()
 
-# Precompute article embeddings -------------------------------------------------
+# ------------------------------------------------------
+# PRECOMPUTE ARTICLE EMBEDDINGS
+# ------------------------------------------------------
 @st.cache_resource
 def embed_articles(df):
     summaries = df["summary"].fillna("").tolist()
@@ -82,13 +84,12 @@ with col1:
 with col2:
     search_btn = st.button("Search", use_container_width=True)
 
-# Generate search suggestions dynamically
+# Dynamic suggestions
 def get_suggestions(text):
     if not text:
         return []
     pool = list({kw for lst in df["keyword_list"] for kw in lst})
-    suggestions = [kw for kw in pool if text.lower() in kw.lower()]
-    return suggestions[:8]
+    return [kw for kw in pool if text.lower() in kw.lower()][:8]
 
 if query:
     suggestions = get_suggestions(query)
@@ -102,33 +103,35 @@ st.markdown("---")
 
 
 # ------------------------------------------------------
-# RUN SEARCH
+# RUN SEMANTIC SEARCH
 # ------------------------------------------------------
 if search_btn and query:
 
     with st.spinner("🔎 Analyzing articles with AI… please wait..."):
         time.sleep(1)
 
+        # Encode query
         q_embedding = model.encode([query])[0]
 
-        # Compute similarity
+        # Compute similarity scores
         sims = cosine_similarity([q_embedding], article_embeddings)[0]
         df["similarity"] = sims
 
+        # Top result
         best = df.sort_values("similarity", ascending=False).iloc[0]
 
     # ------------------------------------------------------
-    # DISPLAY TOP MATCHING RESULT
+    # DISPLAY TOP MATCHING ARTICLE
     # ------------------------------------------------------
     st.markdown("## 📄 Top Matching Article")
 
-    # Format date safely
+    # Format date
     if pd.notnull(best["timestamp"]):
         published_date = best["timestamp"].strftime("%B %d, %Y")
     else:
         published_date = "Unknown"
 
-    st.markdown(f"""
+    top_article_html = f"""
     <div style="padding:20px; background:#111; border-radius:12px;">
         <h2 style="color:#04d9ff;">{best['title']}</h2>
         <p style="color:#ccc;">{best['summary']}</p>
@@ -139,7 +142,43 @@ if search_btn and query:
            🔗 Read Full Article
         </a>
     </div>
-    """, unsafe_allow_html=True)
+    """
+
+    st.markdown(top_article_html, unsafe_allow_html=True)
+
+    # ------------------------------------------------------
+    # DISPLAY TOP RELATED ARTICLES
+    # ------------------------------------------------------
+    st.markdown("## 📰 Related Articles")
+
+    top_k = 5
+    related_df = df.sort_values("similarity", ascending=False).iloc[1 : top_k + 1]
+
+    if related_df.empty:
+        st.info("No related articles found.")
+    else:
+        for _, row in related_df.iterrows():
+
+            if pd.notnull(row["timestamp"]):
+                pub_date = row["timestamp"].strftime("%B %d, %Y")
+            else:
+                pub_date = "Unknown"
+
+            html_block = f"""
+            <div style="padding:15px; background:#111; border-radius:12px; margin-bottom:15px;">
+                <h3 style="color:#04d9ff;">{row['title']}</h3>
+                <p style="color:#ccc;">{row['summary']}</p>
+                <p><b style="color:#04d9ff;">Published:</b> {pub_date}</p>
+                <p><b style="color:#04d9ff;">Keywords:</b> {row['keywords']}</p>
+                <p><b style="color:#04d9ff;">Similarity:</b> {row['similarity']:.4f}</p>
+                <a href="{row['url']}" target="_blank"
+                   style="color:#00eaff; font-size:16px; font-weight:bold; text-decoration:none;">
+                   🔗 Read Full Article
+                </a>
+            </div>
+            """
+
+            st.markdown(html_block, unsafe_allow_html=True)
 
     # ------------------------------------------------------
     # EXPORT RESULTS
@@ -166,41 +205,3 @@ st.markdown("""
 Fraud Intelli © 2025 — Built with ❤️ by UNC Charlotte SDS Team  
 </div>
 """, unsafe_allow_html=True)
-
-# ------------------------------------------------------
-# DISPLAY TOP RELATED ARTICLES
-# ------------------------------------------------------
-st.markdown("## 📰 Related Articles")
-
-# Get top 5 (excluding the already displayed best match)
-top_k = 5
-related_df = df.sort_values("similarity", ascending=False).iloc[1 : top_k + 1]
-
-if related_df.empty:
-    st.info("No related articles found.")
-else:
-    for _, row in related_df.iterrows():
-
-        # Format date
-        if pd.notnull(row["timestamp"]):
-            pub_date = row["timestamp"].strftime("%B %d, %Y")
-        else:
-            pub_date = "Unknown"
-
-        st.markdown(f"""
-        <div style="padding:15px; background:#111; border-radius:12px; margin-bottom:15px;">
-            <h3 style="color:#04d9ff;">{row['title']}</h3>
-            <p style="color:#ccc;">{row['summary']}</p>
-            <p><b style="color:#04d9ff;">Published:</b> {pub_date}</p>
-            <p><b style="color:#04d9ff;">Keywords:</b> {row['keywords']}</p>
-            <p><b style="color:#04d9ff;">Similarity:</b> {row['similarity']:.4f}</p>
-            <a href="{row['url']}" target="_blank"
-               style="color:#00eaff; font-size:16px; font-weight:bold; text-decoration:none;">
-               🔗 Read Full Article
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
-
-        </div>
-        """, unsafe_allow_html=True)
-
