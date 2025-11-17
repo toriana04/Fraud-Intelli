@@ -1,3 +1,4 @@
+import streamlit as st
 # ============================================================
 #   FRAUD INTELLI PREMIUM BRAND THEME (FULL DARK MODE)
 # ============================================================
@@ -164,4 +165,5 @@ st.markdown("""
     Science</b> and <b>USAA</b>.
     </p>
 </div>
+
 """, unsafe_allow_html=True)
