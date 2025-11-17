@@ -1,3 +1,4 @@
+import streamlit as st
 # ============================================================
 #   FRAUD INTELLI PREMIUM BRAND THEME (FULL DARK MODE)
 # ============================================================
@@ -230,4 +231,5 @@ st.download_button(
     filtered.to_csv(index=False),
     file_name="filtered_fraud_data.csv",
     mime="text/csv"
+
 )
