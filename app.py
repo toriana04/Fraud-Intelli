@@ -166,3 +166,37 @@ st.markdown("""
 Fraud Intelli © 2025 — Built with ❤️ by UNC Charlotte SDS Team  
 </div>
 """, unsafe_allow_html=True)
+
+# ------------------------------------------------------
+# DISPLAY TOP RELATED ARTICLES
+# ------------------------------------------------------
+st.markdown("## 📰 Related Articles")
+
+# Get top 5 (excluding the top one already shown)
+top_k = 5
+related_df = df.sort_values("similarity", ascending=False).iloc[1: top_k + 1]
+
+if related_df.empty:
+    st.info("No related articles found.")
+else:
+    for _, row in related_df.iterrows():
+
+        # Format date
+        if pd.notnull(row["timestamp"]):
+            pub_date = row["timestamp"].strftime("%B %d, %Y")
+        else:
+            pub_date = "Unknown"
+
+        st.markdown(f"""
+        <div style="padding:15px; background:#111; border-radius:12px; margin-bottom:15px;">
+            <h3 style="color:#04d9ff;">{row['title']}</h3>
+            <p style="color:#ccc;">{row['summary']}</p>
+            <p><b style="color:#04d9ff;">Published:</b> {pub_date}</p>
+            <p><b style="color:#04d9ff;">Keywords:</b> {row['keywords']}</p>
+            <p><b style="color:#04d9ff;">Similarity:</b> {row['similarity']:.4f}</p>
+            <a href="{row['url']}" target="_blank"
+               style="color:#00eaff; font-size:16px; font-weight:bold; text-decoration:none;">
+               🔗 Read Full Article
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
