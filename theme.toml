@@ -1,7 +1,7 @@
 [theme]
 base="light"
-primaryColor="#0A65FF"               # IntelliFraud Blue
-backgroundColor="#FFFFFF"            # White
-secondaryBackgroundColor="#F5F7FA"   # Soft gray-blue
-textColor="#1A1A1A"                  # Near-black text
+primaryColor="#0A65FF"
+backgroundColor="#FFFFFF"
+secondaryBackgroundColor="#F5F7FA"
+textColor="#0A1A2F"
 font="sans serif"
