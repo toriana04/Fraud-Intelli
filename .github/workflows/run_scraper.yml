@@ -1,14 +1,15 @@
 name: Run IntelliFraud Scraper
 
 on:
+  schedule:
+    - cron: "0 6 * * 0"   # Every Sunday at 6 AM UTC
   workflow_dispatch:
 
 jobs:
-  scrape:
+  run-scraper:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -17,22 +18,19 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r scraper/requirements.txt
           python -m playwright install --with-deps chromium
 
-      - name: Export Supabase Secrets
+      # ------------------------------------------------------------------
+      # FIX: Base64 encode secrets so GitHub does NOT mask or strip them
+      # ------------------------------------------------------------------
+      - name: Export Supabase Secrets (Base64 encoded)
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
-          echo "Secrets exported."
-
-      - name: Debug Supabase Secrets
-        run: |
-          echo "URL length: ${#SUPABASE_URL}"
-          echo "KEY length: ${#SUPABASE_KEY}"
+          echo "SUPABASE_URL_BASE64=$(printf '%s' '${{ secrets.SUPABASE_URL }}' | base64 -w 0)" >> $GITHUB_ENV
+          echo "SUPABASE_KEY_BASE64=$(printf '%s' '${{ secrets.SUPABASE_KEY }}' | base64 -w 0)" >> $GITHUB_ENV
 
       - name: Run FINRA API URL Discovery
         run: |
@@ -45,6 +43,9 @@ jobs:
           python playwright_extract_articles.py
 
       - name: Upload CSV to Supabase
+        env:
+          SUPABASE_URL_BASE64: ${{ env.SUPABASE_URL_BASE64 }}
+          SUPABASE_KEY_BASE64: ${{ env.SUPABASE_KEY_BASE64 }}
         run: |
           cd scraper
           python upload_supabase.py
