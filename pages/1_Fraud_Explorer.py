@@ -8,7 +8,7 @@ st.set_page_config(page_title="Fraud Explorer", layout="wide")
 
 st.markdown("""
 <div style="text-align:center; margin-bottom:20px;">
-    <img src="https://i.imgur.com/kIzoyP2.png" width="150" style="border-radius:20px;"/>
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="150" style="border-radius:20px;"/>
 </div>
 
 <h1 style="text-align:center; color:#04d9ff; font-weight:900;">
@@ -152,3 +152,4 @@ else:
             <a href="{url}" target="_blank" style="color:#04d9ff;"><strong>Read Full Article</strong></a>
         </div>
         """, unsafe_allow_html=True)
+
