@@ -1,45 +1,46 @@
-"""
-=====================================================================
- INTELLIFRAUD — SUPABASE CSV UPLOADER (FINAL VERSION)
- Bucket: DTSC_project
-=====================================================================
-"""
-
 import os
+import base64
 from supabase import create_client, Client
 
-CSV_PATH = "../data/fraud_articles.csv"
-BUCKET_NAME = "DTSC_project"   # <-- FIXED BUCKET NAME
-DESTINATION_FILE = "fraud_articles.csv"
+CSV_PATH = "fraud_articles.csv"
+BUCKET_NAME = "DTSC_project"
 
+def decode_env(key: str):
+    """Decode Base64 secrets safely."""
+    value = os.getenv(key)
+    if not value:
+        return None
+    return base64.b64decode(value).decode("utf-8")
+
+# ----------------------------
+# Load Base64-encoded secrets
+# ----------------------------
+SUPABASE_URL = decode_env("SUPABASE_URL_BASE64")
+SUPABASE_KEY = decode_env("SUPABASE_KEY_BASE64")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("Supabase credentials missing from environment variables.")
+
+# ----------------------------
+# Create Supabase client
+# ----------------------------
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def upload_file():
-    url = os.getenv("https://debqilwldhawthyjrlsh.supabase.co")
-    key = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlYnFpbHdsZGhhd3RoeWpybHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NDE4ODMsImV4cCI6MjA3NjIxNzg4M30.gsTqH9cQKjqOR6SZ81jN82DV4hMLTynjdDmvNrfH5uE")
-
-    if not url or not key:
-        raise RuntimeError("Supabase credentials missing from environment variables.")
-
-    supabase: Client = create_client(url, key)
-
-    print("\n[+] Uploading CSV to Supabase (using update)…\n")
+    print("[+] Uploading CSV to Supabase...")
 
     with open(CSV_PATH, "rb") as f:
-        file_bytes = f.read()
+        data = f.read()
 
-    # Use update() because upload() requires upsert headers that break in GitHub Actions
-    result = supabase.storage.from_(BUCKET_NAME).update(
-        path=DESTINATION_FILE,
-        file=file_bytes,
-        file_options={
-            "contentType": "text/csv",
-            "cacheControl": "3600"
-        }
+    # Upload/replace CSV in the bucket
+    result = supabase.storage.from_(BUCKET_NAME).upload(
+        path=CSV_PATH,
+        file=data,
+        file_options={"content-type": "text/csv", "upsert": True}
     )
 
-    print("✔ Upload complete:", result)
-    return result
-
+    print("[✓] Upload successful!")
+    print("Supabase response:", result)
 
 if __name__ == "__main__":
     upload_file()
