@@ -8,7 +8,7 @@ st.set_page_config(page_title="Fraud Definitions", layout="wide")
 
 st.markdown("""
 <div style="text-align:center; margin-bottom:10px;">
-    <img src="https://i.imgur.com/kIzoyP2.png" width="140" style="border-radius:20px;"/>
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="140" style="border-radius:20px;"/>
 </div>
 
 <h1 style="text-align:center; color:#04d9ff; font-weight:900;">
@@ -127,3 +127,4 @@ else:
             <p style="font-size:16px; line-height:1.5;">{get_definition(term)}</p>
         </div>
         """, unsafe_allow_html=True)
+
