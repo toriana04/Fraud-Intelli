@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sklearn.feature_extraction.text import TfiddfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -167,7 +167,7 @@ with col4:
 # ------------------------------------------------------------
 st.subheader("📝 Your Search History")
 
-# Clear history button (FIXED)
+# Clear history button (using st.rerun())
 if st.button("🗑️ Clear Search History"):
     st.session_state["search_history"] = []
     st.success("Search history cleared!")
