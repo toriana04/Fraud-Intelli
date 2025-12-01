@@ -1,25 +1,33 @@
 import streamlit as st
 import pandas as pd
+from intellifraud_ui import inject_light_ui, sidebar_logo
 
 # ------------------------------------------------------------
 # PAGE CONFIG
 # ------------------------------------------------------------
 st.set_page_config(page_title="Fraud Explorer", layout="wide")
+inject_light_ui()
+sidebar_logo()
 
+# ------------------------------------------------------------
+# HEADER HERO
+# ------------------------------------------------------------
 st.markdown("""
-<div style="text-align:center; margin-bottom:20px;">
-    <img src="https://i.imgur.com/lAVJ7Vx.png" width="150" style="border-radius:20px;"/>
+<div style="
+    padding: 25px; 
+    background: #F5F7FA; 
+    border-radius: 15px; 
+    border: 1px solid #E6E9EF; 
+    margin-bottom: 20px;
+">
+    <h1 style="text-align:center; color:#0A1A2F; margin-bottom:5px;">
+        🗂️ Fraud Explorer
+    </h1>
+    <p style="text-align:center; font-size:17px; color:#0A1A2F;">
+        Explore regulatory enforcement articles organized by real-world fraud categories.
+    </p>
 </div>
-
-<h1 style="text-align:center; color:#04d9ff; font-weight:900;">
-🗂️ Fraud Explorer
-</h1>
-
-<p style="text-align:center; font-size:18px;">
-Explore regulatory enforcement articles organized by real-world fraud types.
-</p>
 """, unsafe_allow_html=True)
-
 
 # ------------------------------------------------------------
 # LOAD DATA
@@ -36,26 +44,23 @@ def load_data():
 
 df = load_data()
 
-
 # ------------------------------------------------------------
-# FRAUD CATEGORIES — BUILT FROM YOUR REAL DATA
+# FRAUD CATEGORIES
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
         "investment fraud", "investment scams", "investment scam", "investing",
-        "fraud investment", "fraud investors", "investment frauds", "invest ai",
-        "ai investment", "ai trading"
+        "invest ai", "ai trading", "ai investment"
     ],
-    
+
     "Financial Fraud": [
-        "financial fraud", "financial scam", "fraud recovering", "fraud recovery",
-        "fraud collaboration", "fighting fraud", "stop fraud", "fraud awareness",
-        "fraud findings", "fraud specialists", "fraud trends"
+        "financial fraud", "financial scam", "fraud recovering", "fraud awareness",
+        "fraud specialists", "fraud trends"
     ],
 
     "Cyber & AI Fraud": [
-        "genai fraud", "accounts genai", "computer fraudsters", "fraudsters using",
-        "ai trading", "ai investment", "artificial fraud"
+        "genai fraud", "accounts genai", "computer fraudsters", "ai trading",
+        "ai investment", "artificial fraud"
     ],
 
     "Mail & Check Fraud": [
@@ -71,14 +76,13 @@ FRAUD_CATEGORIES = {
     ],
 
     "Money Laundering": [
-        "money laundering", "laundering fraud", "laundering frauds", "illicit finance"
+        "money laundering", "illicit finance", "laundering fraud"
     ],
 }
 
-# Lowercase category keywords once
+# Lowercase categories
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
-
 
 # ------------------------------------------------------------
 # MATCHING FUNCTION
@@ -87,16 +91,12 @@ def match_score(article_keywords, category_keywords):
     score = 0
     for a_kw in article_keywords:
         for c_kw in category_keywords:
-
-            # Phrase-in-keyword OR keyword-in-phrase match
             if c_kw in a_kw or a_kw in c_kw:
                 score += 1
-
     return score
 
-
 def get_articles(category_name):
-    """Return list of best-matching articles for a fraud category."""
+    """Return sorted list of articles matching category."""
     cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
@@ -105,14 +105,11 @@ def get_articles(category_name):
         if score > 0:
             results.append((score, row))
 
-    # Best match first
     results.sort(key=lambda x: x[0], reverse=True)
-
     return [row for score, row in results]
 
-
 # ------------------------------------------------------------
-# UI — CATEGORY PICKER
+# CATEGORY PICKER
 # ------------------------------------------------------------
 st.subheader("🧭 Select a Fraud Category")
 
@@ -121,8 +118,10 @@ selected_category = st.selectbox(
     list(FRAUD_CATEGORIES.keys())
 )
 
-st.markdown(f"<h2 style='color:#04d9ff;'>📂 {selected_category}</h2>", unsafe_allow_html=True)
-
+st.markdown(
+    f"<h2 style='color:#0A65FF; margin-top:15px;'>📂 {selected_category}</h2>",
+    unsafe_allow_html=True
+)
 
 # ------------------------------------------------------------
 # DISPLAY MATCHING ARTICLES
@@ -138,18 +137,21 @@ else:
         url = row["url"]
         keywords = ", ".join(row["keywords"])
 
+        # Light-mode article card
         st.markdown(f"""
         <div style="
-            background-color:#0e1117; 
+            background-color:#FFFFFF; 
             padding:18px; 
-            margin-bottom:12px; 
+            margin-bottom:15px; 
             border-radius:12px; 
-            border:1px solid #04d9ff;
+            border:1px solid #E6E9EF;
+            box-shadow:0 1px 3px rgba(0,0,0,0.05);
         ">
-            <h3 style="color:#04d9ff;">{title}</h3>
-            <p>{summary}</p>
+            <h3 style="color:#0A1A2F; margin-bottom:6px;">{title}</h3>
+            <p style="color:#0A1A2F;">{summary}</p>
             <p><strong>Keywords:</strong> {keywords}</p>
-            <a href="{url}" target="_blank" style="color:#04d9ff;"><strong>Read Full Article</strong></a>
+            <a href="{url}" target="_blank" style="color:#0A65FF; font-weight:600;">
+                Read Full Article →
+            </a>
         </div>
         """, unsafe_allow_html=True)
-
