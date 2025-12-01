@@ -1,27 +1,37 @@
 import streamlit as st
 import pandas as pd
+from intellifraud_ui import inject_light_ui, sidebar_logo
 
 # ---------------------------------------------
-# PAGE CONFIG & HEADER
+# PAGE CONFIG & UI
 # ---------------------------------------------
 st.set_page_config(page_title="Fraud Definitions", layout="wide")
+inject_light_ui()
+sidebar_logo()
 
+# ---------------------------------------------
+# HEADER HERO
+# ---------------------------------------------
 st.markdown("""
-<div style="text-align:center; margin-bottom:10px;">
-    <img src="https://i.imgur.com/lAVJ7Vx.png" width="140" style="border-radius:20px;"/>
+<div style="
+    padding: 25px; 
+    background: #F5F7FA; 
+    border-radius: 15px; 
+    border: 1px solid #E6E9EF; 
+    margin-bottom: 20px;
+    text-align:center;
+">
+    <h1 style="color:#0A1A2F; margin-bottom:5px;">
+        📘 Fraud Glossary & Definitions
+    </h1>
+    <p style="font-size:17px; color:#0A1A2F;">
+        A searchable glossary of fraud-related terms and formal regulatory categories used in compliance and enforcement.
+    </p>
 </div>
-
-<h1 style="text-align:center; color:#04d9ff; font-weight:900;">
-📘 Fraud Glossary & Definitions
-</h1>
-
-<p style="text-align:center; font-size:18px;">
-A searchable glossary of fraud-related terms and formal fraud categories used in compliance, regulation, and enforcement.
-</p>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# LOAD CSV & EXTRACT KEYWORDS
+# LOAD DATA & KEYWORDS
 # ---------------------------------------------
 @st.cache_data
 def load_data():
@@ -33,86 +43,90 @@ def load_data():
 
 df = load_data()
 
-# Unique keyword list
 all_keywords = sorted({kw for lst in df["keywords"] for kw in lst})
 
-
 # ---------------------------------------------
-# TYPES OF FRAUD (CURATED LIST)
+# FRAUD TYPE DEFINITIONS (Your curated list)
 # ---------------------------------------------
 FRAUD_TYPES = {
-    "Investment Fraud": "Deceptive practices that induce investors to make financial decisions based on misleading, false, or incomplete information.",
-    "Securities Fraud": "Illegal activities involving the manipulation or deception of investors in financial markets.",
-    "Identity Theft": "When a criminal steals and uses personal information for unauthorized financial activity.",
-    "Account Takeover": "When a fraudster gains unauthorized control of an individual's financial or online accounts.",
-    "Money Laundering": "The process of disguising illegal financial proceeds as legitimate funds.",
-    "Wire Fraud": "Fraud conducted via electronic communication, including phone, internet, or email.",
-    "Phishing": "Social engineering attacks attempting to steal sensitive information by impersonating trusted entities.",
-    "Elder Fraud": "Financial exploitation targeting older adults, often through scams, coercion, or deception.",
-    "Affinity Fraud": "Scams targeting members of identifiable groups such as religious, ethnic, or professional communities.",
-    "Insider Trading": "The illegal act of trading securities based on material, non-public information.",
-    "Market Manipulation": "Interference with financial markets to create artificial asset prices or trading activity.",
-    "Ponzi Scheme": "Fraudulent investments where returns are paid using funds from new investors instead of profits.",
-    "Pyramid Scheme": "A business model that recruits members with the promise of payments for enrolling others rather than actual investments or sales.",
-    "Embezzlement": "Theft or misappropriation of funds placed in someone's trust or belonging to their employer.",
-    "Cyber Fraud": "Fraud conducted through digital channels, including hacking, malware, and unauthorized access.",
-    "Credit Card Fraud": "Unauthorized use of another person’s credit card information for financial gain.",
-    "Mortgage Fraud": "Intentional misrepresentation or omission of information used to obtain a home loan.",
-    "Insurance Fraud": "Deception committed to obtain a benefit from an insurance provider through false claims or statements.",
+    "Investment Fraud": "Deceptive practices that induce investors to make financial decisions based on misleading or incomplete information.",
+    "Securities Fraud": "Illegal activities involving deception or manipulation in securities markets.",
+    "Identity Theft": "Criminal use of stolen personal information for unauthorized financial activity.",
+    "Account Takeover": "Unauthorized access and control of a customer's financial or digital accounts.",
+    "Money Laundering": "Disguising illicit financial proceeds to appear legitimate.",
+    "Wire Fraud": "Fraud using electronic communication such as phone, internet, or email.",
+    "Phishing": "Impersonation attacks to steal sensitive information.",
+    "Elder Fraud": "Financial exploitation targeting older adults, often involving coercion or deception.",
+    "Affinity Fraud": "Scams targeting members of identifiable groups such as religious or ethnic communities.",
+    "Insider Trading": "Illegal trading of securities based on confidential, non-public information.",
+    "Market Manipulation": "Interference with markets to artificially influence prices or trading volume.",
+    "Ponzi Scheme": "Paying returns to investors using new investor money rather than profits.",
+    "Pyramid Scheme": "Recruitment-based fraud where payouts depend on enrolling others.",
+    "Embezzlement": "Theft or misappropriation of funds entrusted to someone.",
+    "Cyber Fraud": "Fraud conducted via digital channels including hacking or malware.",
+    "Credit Card Fraud": "Unauthorized use of someone’s credit card information.",
+    "Mortgage Fraud": "Misrepresentation or omission of data to obtain a home loan.",
+    "Insurance Fraud": "False claims or information to obtain illegitimate insurance benefits.",
 }
 
-
 # ---------------------------------------------
-# BUILT-IN DEFINITIONS FOR KEYWORDS
+# BUILT-IN KEYWORD DEFINITIONS
 # ---------------------------------------------
 DEFAULT_DEFINITIONS = {
-    "ponzi scheme": "A fraudulent investment operation where earlier investors are paid using the capital of new investors.",
-    "scam": "A dishonest scheme designed to trick or defraud a person or organization.",
-    "fraud": "Any intentional deception used to secure financial or personal gain.",
-    "securities fraud": "Deceptive practices in stock or commodities markets intended to mislead investors.",
-    "insider trading": "Illegal trading of securities based on confidential, non-public information.",
-    "phishing": "Cyber deception involving impersonation to steal sensitive information.",
-    "money laundering": "Disguising the origins of illegally obtained money to make it appear legitimate.",
-    "identity theft": "The unauthorized acquisition and use of someone’s personal data for fraud.",
-    "market manipulation": "Interfering with financial markets to create artificial prices or trading levels.",
-    "investment fraud": "Any deceptive practice that persuades investors to make decisions based on misinformation.",
+    "ponzi scheme": "A fraudulent operation where earlier investors are paid using funds from new investors.",
+    "scam": "A dishonest scheme intended to deceive or defraud.",
+    "fraud": "Intentional deception for financial or personal gain.",
+    "securities fraud": "Deception in stock or commodities markets to mislead investors.",
+    "insider trading": "Illegal trading based on confidential, non-public information.",
+    "phishing": "Cyber deception involving impersonation to steal data.",
+    "money laundering": "Disguising the origins of illegal money.",
+    "identity theft": "Unauthorized use of someone's personal data.",
+    "market manipulation": "Creating artificial market activity or prices.",
+    "investment fraud": "Deceiving investors using misleading financial information.",
 }
 
 def get_definition(term):
-    """Return definition if exists, else fallback."""
+    """Return an official or fallback definition."""
     if term in DEFAULT_DEFINITIONS:
         return DEFAULT_DEFINITIONS[term]
-
-    return f"{term.capitalize()} refers to activity commonly connected to financial misconduct, fraud risk, or investor harm."
-
+    return f"{term.capitalize()} refers to activity commonly associated with financial misconduct or fraud-related risk."
 
 # ---------------------------------------------
-# SECTION 1 — TYPES OF FRAUD GLOSSARY
+# SECTION 1 — Major Fraud Types
 # ---------------------------------------------
 st.subheader("🧭 Major Types of Fraud")
 
 for fraud_type, definition in FRAUD_TYPES.items():
     st.markdown(f"""
-    <div style="padding:12px; margin-bottom:10px; border-radius:10px; 
-                background-color:#0e1117; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff; margin-bottom:6px;">{fraud_type}</h3>
-        <p style="font-size:16px; line-height:1.5;">{definition}</p>
+    <div style="
+        padding:14px; 
+        margin-bottom:12px; 
+        border-radius:10px; 
+        background-color:#FFFFFF; 
+        border:1px solid #E6E9EF;
+        box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    ">
+        <h3 style="color:#0A65FF; margin-bottom:6px;">{fraud_type}</h3>
+        <p style="font-size:15px; color:#0A1A2F; line-height:1.5;">
+            {definition}
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-
 # ---------------------------------------------
-# SECTION 2 — SEARCH KEYWORDS
+# SECTION 2 — Search Field
 # ---------------------------------------------
 st.subheader("🔍 Search Fraud Terms (Keywords from Articles)")
 
-search = st.text_input("Search for a keyword:", placeholder="Type a term...").lower().strip()
+search = st.text_input(
+    "Search for a keyword:",
+    placeholder="Type a term such as 'phishing', 'laundering', 'identity'..."
+).lower().strip()
 
 filtered_keywords = [kw for kw in all_keywords if search in kw] if search else all_keywords
 
-
 # ---------------------------------------------
-# SECTION 3 — KEYWORD DEFINITIONS
+# SECTION 3 — Keyword Glossary
 # ---------------------------------------------
 st.subheader("📖 Keyword Glossary Derived from Articles")
 
@@ -121,10 +135,17 @@ if not filtered_keywords:
 else:
     for term in filtered_keywords:
         st.markdown(f"""
-        <div style="padding:12px; margin-bottom:10px; border-radius:10px; 
-                    background-color:#0e1117; border:1px solid #04d9ff;">
-            <h3 style="color:#04d9ff; margin-bottom:6px;">{term.capitalize()}</h3>
-            <p style="font-size:16px; line-height:1.5;">{get_definition(term)}</p>
+        <div style="
+            padding:14px; 
+            margin-bottom:12px; 
+            border-radius:10px; 
+            background-color:#FFFFFF; 
+            border:1px solid #E6E9EF;
+            box-shadow:0 1px 3px rgba(0,0,0,0.05);
+        ">
+            <h3 style="color:#0A65FF; margin-bottom:6px;">{term.capitalize()}</h3>
+            <p style="font-size:15px; color:#0A1A2F; line-height:1.5;">
+                {get_definition(term)}
+            </p>
         </div>
         """, unsafe_allow_html=True)
-
