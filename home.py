@@ -3,10 +3,12 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 # ------------------------------------------------------------
 # PAGE CONFIG
 # ------------------------------------------------------------
 st.set_page_config(page_title="HOME", layout="wide")
+
 
 # ------------------------------------------------------------
 # HEADER
@@ -21,7 +23,8 @@ st.markdown("""
 </h1>
 
 <p style="text-align:center; font-size:18px; max-width:700px; margin:auto;">
-Your interactive fraud intelligence dashboard for exploring regulatory actions, fraud trends, keyword insights, and core definitions — all in one place.
+Your interactive fraud intelligence dashboard for exploring regulatory actions, 
+fraud trends, article insights, and key definitions — all in one place.
 </p>
 """, unsafe_allow_html=True)
 
@@ -33,9 +36,8 @@ Your interactive fraud intelligence dashboard for exploring regulatory actions, 
 def load_data():
     df = pd.read_csv("fraud_analysis_final.csv")
 
-    # Prepare cleaned text for similarity search
+    # Clean text for similarity search
     df["keywords_clean"] = df["keywords"].fillna("").astype(str)
-
     df["search_text"] = (
         df["title"].fillna("") + " " +
         df["summary"].fillna("") + " " +
@@ -48,7 +50,7 @@ df = load_data()
 
 
 # ------------------------------------------------------------
-# TF-IDF MODEL
+# BUILD TF-IDF MODEL
 # ------------------------------------------------------------
 @st.cache_resource
 def build_tfidf():
@@ -59,8 +61,8 @@ def build_tfidf():
 vectorizer, tfidf_matrix = build_tfidf()
 
 
-def get_best_article(query):
-    """Return best-matching article + similarity score."""
+def best_article_match(query):
+    """Returns best article and similarity score."""
     query_vec = vectorizer.transform([query.lower()])
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
 
@@ -71,48 +73,49 @@ def get_best_article(query):
 
 
 # ------------------------------------------------------------
-# SMART ROUTER
+# SMART ROUTER (FIXED FOR YOUR ACTUAL FILE NAMES)
 # ------------------------------------------------------------
 def route_query(query):
     q = query.lower().strip()
 
-    # Trends Routing
+    # --- ROUTE TO FRAUD TRENDS ---
     trend_words = ["trend", "trends", "pattern", "patterns", "keyword", "keywords", "analysis", "chart"]
     if any(w in q for w in trend_words):
-        st.session_state["page"] = "trends"
         st.switch_page("pages/2_Fraud Trends.py")
+        return True
 
-    # Glossary Routing
+    # --- ROUTE TO DEFINITIONS ---
     glossary_words = ["definition", "define", "term", "terms", "glossary", "what is", "types of fraud"]
     if any(w in q for w in glossary_words):
-        st.session_state["page"] = "glossary"
-        st.switch_page("pages/3_Fraud Definitions.py")
+        st.switch_page("pages/3_Fraud_Definitions.py")
+        return True
 
-    # Explorer Routing
+    # --- ROUTE TO FRAUD EXPLORER ---
     explorer_words = ["category", "categories", "explore", "fraud types", "fraud category"]
     if any(w in q for w in explorer_words):
-        st.session_state["page"] = "explorer"
-        st.switch_page("pages/1_Fraud Explorer.py")
+        st.switch_page("pages/1_Fraud_Explorer.py")
+        return True
 
-    # Otherwise → do article similarity search
     return None
 
 
 # ------------------------------------------------------------
-# SEARCH BAR UI
+# SEARCH BAR
 # ------------------------------------------------------------
 st.subheader("🔎 Search Across IntelliFraud")
 
 query = st.text_input(
     "Ask a question, look up a trend, search a fraud term, or enter keywords:",
-    placeholder="Try things like 'GenAI fraud', 'investment scams', or 'trend analysis'..."
+    placeholder="Try: 'AI fraud', 'investment scams', 'trend analysis', 'what is money laundering?'"
 )
 
 if query:
-    # First try routing
-    if route_query(query) is None:
-        # Then show the best article match
-        best_article, score = get_best_article(query)
+    # FIRST: try routing
+    routed = route_query(query)
+
+    # If not routed → return similarity-matched article
+    if not routed:
+        article, score = best_article_match(query)
 
         st.markdown("<h3 style='color:#04d9ff;'>Top Article Match</h3>", unsafe_allow_html=True)
 
@@ -124,11 +127,11 @@ if query:
             border-radius:12px; 
             border:1px solid #04d9ff;
         ">
-            <h3 style="color:#04d9ff;">{best_article['title']}</h3>
-            <p>{best_article['summary']}</p>
-            <p><strong>Keywords:</strong> {best_article['keywords']}</p>
+            <h3 style="color:#04d9ff;">{article['title']}</h3>
+            <p>{article['summary']}</p>
+            <p><strong>Keywords:</strong> {article['keywords']}</p>
             <p><strong>Similarity Score:</strong> {score:.2f}</p>
-            <a href="{best_article['url']}" target="_blank" style="color:#04d9ff;"><strong>Read Full Article</strong></a>
+            <a href="{article['url']}" target="_blank" style="color:#04d9ff;"><strong>Read Article</strong></a>
         </div>
         """, unsafe_allow_html=True)
 
@@ -152,7 +155,7 @@ with col2:
     st.markdown("""
     <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
         <h3 style="color:#04d9ff;">📊 Fraud Trends</h3>
-        <p>See keyword frequencies and activity over time.</p>
+        <p>View keyword patterns and activity over time.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -160,19 +163,17 @@ with col3:
     st.markdown("""
     <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
         <h3 style="color:#04d9ff;">📘 Fraud Glossary</h3>
-        <p>Learn definitions of core fraud concepts.</p>
+        <p>Understand key fraud definitions and terms.</p>
     </div>
     """, unsafe_allow_html=True)
-
 
 with col4:
     st.markdown("""
     <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff;">🔍 Search Engine</h3>
-        <p>Find the best article based on relevance.</p>
+        <h3 style="color:#04d9ff;">🔍 Article Search</h3>
+        <p>Find the most relevant article using similarity scoring.</p>
     </div>
     """, unsafe_allow_html=True)
-
 
 
 # ------------------------------------------------------------
@@ -184,20 +185,20 @@ st.markdown("""
 
 <div style="background-color:#0e1117; padding:15px; border-radius:10px; border:1px solid #04d9ff;">
 <p style="font-size:16px;">
-The similarity score shows how closely your search query matches an article 
+A similarity score represents how closely your search query aligns with an article 
 based on its title, summary, and keywords. Scores range from:
 </p>
 
 <ul style="font-size:16px;">
-<li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
+<li><strong>0.80 – 1.00:</strong> Very strong match</li>
 <li><strong>0.60 – 0.79:</strong> Strong match</li>
 <li><strong>0.40 – 0.59:</strong> Moderate match</li>
 <li><strong>0.00 – 0.39:</strong> Weak or unrelated</li>
 </ul>
 
 <p style="font-size:16px;">
-Similarity is calculated using TF-IDF (Term Frequency–Inverse Document Frequency) 
-and cosine similarity, a technique commonly used in information retrieval and NLP.
+Similarity is calculated using TF-IDF and cosine similarity — common techniques 
+used in search engines and natural language processing.
 </p>
 </div>
 """, unsafe_allow_html=True)
