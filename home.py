@@ -167,9 +167,10 @@ with col4:
 # ------------------------------------------------------------
 st.subheader("📝 Your Search History")
 
-# Clear history button (using st.rerun())
+# Clear history button
 if st.button("🗑️ Clear Search History"):
-    st.session_state["search_history"] = []
+    if "search_history" in st.session_state:
+        del st.session_state["search_history"]
     st.success("Search history cleared!")
     st.rerun()
 
@@ -219,3 +220,4 @@ the same method used in many modern search engines.
 </p>
 </div>
 """, unsafe_allow_html=True)
+
