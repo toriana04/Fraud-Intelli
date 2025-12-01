@@ -1,7 +1,11 @@
 """
 =====================================================================
- INTELLIFRAUD — SELENIUM URL DISCOVERY (CI-SAFE VERSION)
- Works in GitHub Actions (Chromium + Headless)
+ INTELLIFRAUD — SELENIUM URL DISCOVERY (CI-RESILIENT VERSION)
+ Handles:
+   - Headless Chromium
+   - FINRA bot checks
+   - Missing search bar
+   - Slow page load
 =====================================================================
 """
 
@@ -34,7 +38,7 @@ def url_allowed(url: str):
 
 
 def get_driver():
-    """Return a Chromium-based driver that works locally and on GitHub Actions."""
+    """Return Chromium driver with realistic user-agent for FINRA."""
 
     options = Options()
     options.add_argument("--headless=new")
@@ -42,32 +46,67 @@ def get_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # GitHub Actions uses Chromium installed at this location
+    # **Important: Spoof user-agent to avoid bot-block**
+    options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    # Use Chromium binary for GitHub Actions
     if os.path.exists("/usr/bin/chromium-browser"):
         options.binary_location = "/usr/bin/chromium-browser"
 
     return webdriver.Chrome(options=options)
 
 
+def find_search_box(driver, wait):
+    """Tries multiple methods to locate FINRA's search bar (FINRA changes layout often)."""
+
+    selectors = [
+        (By.CLASS_NAME, "custom-landing-search"),
+        (By.CSS_SELECTOR, "input[type='search']"),
+        (By.CSS_SELECTOR, ".search-input"),
+        (By.ID, "searchInput"),
+    ]
+
+    for method, value in selectors:
+        try:
+            print(f"[INFO] Trying search selector: {method} → {value}")
+            return wait.until(EC.presence_of_element_located((method, value)))
+        except:
+            pass
+
+    return None
+
+
 def fetch_urls():
     print("\n[+] Launching Selenium Browser…\n")
 
     driver = get_driver()
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 20)
 
     driver.get(BASE_URL)
+    time.sleep(3)  # Allow JS to load
 
-    print("[+] Searching FINRA…")
-    search_box = wait.until(
-        EC.visibility_of_element_located((By.CLASS_NAME, "custom-landing-search"))
-    )
+    print("[+] Searching for FINRA search bar…")
+
+    search_box = find_search_box(driver, wait)
+
+    if search_box is None:
+        print("\n[ERROR] Could not find search bar. Printing first 500 chars of page:\n")
+        print(driver.page_source[:500])
+        driver.quit()
+        raise RuntimeError("FINRA search bar not found — CI blocked or layout changed.")
+
     search_box.send_keys(SEARCH_QUERY)
     search_box.send_keys(Keys.ENTER)
 
     collected = set()
 
     while len(collected) < MAX_LINKS:
-        wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "search-url")))
+        time.sleep(2)
+
         links = driver.find_elements(By.CLASS_NAME, "search-url")
 
         for l in links:
@@ -79,18 +118,16 @@ def fetch_urls():
             if len(collected) >= MAX_LINKS:
                 break
 
-        # Try pagination
+        # Try next page
         try:
             next_btn = driver.find_element(By.CLASS_NAME, "enabled")
             driver.execute_script("arguments[0].click();", next_btn)
-            time.sleep(1)
         except:
-            print("\n[INFO] No more pages available.\n")
+            print("[INFO] No more pages.")
             break
 
     driver.quit()
 
-    # Save results
     os.makedirs("../data", exist_ok=True)
     with open(OUTPUT_JSON, "w") as f:
         json.dump(list(collected), f, indent=4)
