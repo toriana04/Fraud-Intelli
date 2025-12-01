@@ -1,7 +1,7 @@
 """
 =====================================================================
- INTELLIFRAUD — SUPABASE CSV UPLOADER
- Uploads fraud_articles.csv to Supabase Storage.
+ INTELLIFRAUD — SUPABASE CSV UPLOADER (FIXED FOR NEW SDK)
+ Uses update() instead of upload() to avoid header-value errors.
 =====================================================================
 """
 
@@ -25,11 +25,12 @@ def upload_file():
     with open(CSV_PATH, "rb") as f:
         file_bytes = f.read()
 
-    print("[+] Uploading CSV to Supabase...")
-    res = supabase.storage.from_(BUCKET_NAME).upload(
+    print("[+] Uploading CSV to Supabase (using update)…")
+
+    res = supabase.storage.from_(BUCKET_NAME).update(
         path=DESTINATION_FILE,
         file=file_bytes,
-        file_options={"cacheControl": "3600", "upsert": True}
+        file_options={"contentType": "text/csv", "cacheControl": "3600"}
     )
 
     print("✔ Upload complete:", res)
