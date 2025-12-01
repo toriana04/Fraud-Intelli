@@ -3,7 +3,7 @@ name: Run IntelliFraud Scraper
 on:
   schedule:
     - cron: "0 6 * * 0"   # Every Sunday at 6 AM UTC
-  workflow_dispatch:      # Allow manual triggering
+  workflow_dispatch:      # Allow manual run
 
 jobs:
   run-scraper:
@@ -25,30 +25,17 @@ jobs:
           python-version: "3.10"
 
       # --------------------------------------------------------------
-      # 3. INSTALL GOOGLE CHROME
+      # 3. INSTALL CHROMIUM + MATCHING CHROMEDRIVER
       # --------------------------------------------------------------
-      - name: Install Chrome
+      - name: Install Chromium (browser + driver)
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget gnupg unzip
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt --fix-broken install -y
-          google-chrome --version
-
-      # --------------------------------------------------------------
-      # 4. INSTALL MATCHING CHROMEDRIVER
-      # --------------------------------------------------------------
-      - name: Install ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d '.' -f 1)
-          DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
-          wget "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
-          unzip chromedriver_linux64.zip
-          sudo mv chromedriver /usr/local/bin/
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          chromium-browser --version
           chromedriver --version
 
       # --------------------------------------------------------------
-      # 5. INSTALL PYTHON DEPENDENCIES
+      # 4. INSTALL PYTHON DEPENDENCIES
       # --------------------------------------------------------------
       - name: Install Python dependencies
         run: |
@@ -57,7 +44,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       # --------------------------------------------------------------
-      # 6. IMPORT GITHUB SECRETS INTO ENVIRONMENT VARIABLES
+      # 5. SET SUPABASE ENVIRONMENT VARIABLES
       # --------------------------------------------------------------
       - name: Create environment variables
         run: |
@@ -65,7 +52,7 @@ jobs:
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
 
       # --------------------------------------------------------------
-      # 7. RUN SELENIUM URL SCRAPER
+      # 6. RUN SELENIUM SCRAPER
       # --------------------------------------------------------------
       - name: Run Selenium URL Discovery
         run: |
@@ -73,7 +60,7 @@ jobs:
           python selenium_fetch_urls.py
 
       # --------------------------------------------------------------
-      # 8. RUN PLAYWRIGHT ARTICLE EXTRACTOR
+      # 7. RUN PLAYWRIGHT SCRAPER
       # --------------------------------------------------------------
       - name: Run Playwright Article Extractor
         run: |
@@ -81,7 +68,7 @@ jobs:
           python playwright_extract_articles.py
 
       # --------------------------------------------------------------
-      # 9. UPLOAD FINAL CSV TO SUPABASE
+      # 8. UPLOAD DATA TO SUPABASE
       # --------------------------------------------------------------
       - name: Upload CSV to Supabase
         env:
