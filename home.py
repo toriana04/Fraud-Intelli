@@ -167,6 +167,12 @@ with col4:
 # ------------------------------------------------------------
 st.subheader("📝 Your Search History")
 
+# Clear history button
+if st.button("🗑️ Clear Search History"):
+    st.session_state["search_history"] = []
+    st.success("Search history cleared!")
+    st.experimental_rerun()
+
 history = st.session_state["search_history"]
 
 if len(history) == 0:
