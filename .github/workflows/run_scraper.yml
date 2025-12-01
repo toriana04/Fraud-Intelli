@@ -3,73 +3,42 @@ name: Run IntelliFraud Scraper
 on:
   schedule:
     - cron: "0 6 * * 0"   # Every Sunday at 6 AM UTC
-  workflow_dispatch:      # Allow manual run
+  workflow_dispatch:
 
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------------------------------------------
-      # 1. CHECKOUT REPO
-      # --------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # --------------------------------------------------------------
-      # 2. SET UP PYTHON
-      # --------------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # --------------------------------------------------------------
-      # 3. INSTALL CHROMIUM + MATCHING CHROMEDRIVER
-      # --------------------------------------------------------------
-      - name: Install Chromium (browser + driver)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
-          chromium-browser --version
-          chromedriver --version
-
-      # --------------------------------------------------------------
-      # 4. INSTALL PYTHON DEPENDENCIES
-      # --------------------------------------------------------------
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
-      # --------------------------------------------------------------
-      # 5. SET SUPABASE ENVIRONMENT VARIABLES
-      # --------------------------------------------------------------
       - name: Create environment variables
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
 
-      # --------------------------------------------------------------
-      # 6. RUN SELENIUM SCRAPER
-      # --------------------------------------------------------------
-      - name: Run Selenium URL Discovery
+      - name: Run FINRA API URL Discovery
         run: |
           cd scraper
-          python selenium_fetch_urls.py
+          python fetch_urls_api.py
 
-      # --------------------------------------------------------------
-      # 7. RUN PLAYWRIGHT SCRAPER
-      # --------------------------------------------------------------
       - name: Run Playwright Article Extractor
         run: |
           cd scraper
           python playwright_extract_articles.py
 
-      # --------------------------------------------------------------
-      # 8. UPLOAD DATA TO SUPABASE
-      # --------------------------------------------------------------
       - name: Upload CSV to Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
