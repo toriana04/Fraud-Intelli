@@ -1,25 +1,6 @@
 streamlit
 pandas
 numpy
-beautifulsoup4
-requests
-supabase
-python-dotenv
-
-# Scraping
-selenium
-playwright
-
-# NLP / ML
-torch
-transformers
+scikit-learn
 sentence-transformers
-keybert
-spacy
-
-# Additional
-tiktoken
-accelerate
-
-# SpaCy model
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
+torch
