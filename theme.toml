@@ -1,7 +1,7 @@
 [theme]
 base="light"
-primaryColor="#0072CE"                # Clean finance blue
-backgroundColor="#FFFFFF"             # Pure white
-secondaryBackgroundColor="#F3F6FB"    # Soft light gray-blue
-textColor="#1A1A1A"                   # Dark charcoal
+primaryColor="#0A65FF"               # IntelliFraud Blue
+backgroundColor="#FFFFFF"            # White
+secondaryBackgroundColor="#F5F7FA"   # Soft gray-blue
+textColor="#1A1A1A"                  # Near-black text
 font="sans serif"
