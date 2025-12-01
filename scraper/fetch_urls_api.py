@@ -1,7 +1,7 @@
 """
 =====================================================================
- INTELLIFRAUD — FINRA SEARCH API SCRAPER
- Stable, browserless, CI/CD safe. Replaces Selenium entirely.
+INTELLIFRAUD — FINRA BACKEND SEARCH API SCRAPER (UNBLOCKABLE VERSION)
+Uses the REAL internal FINRA API endpoint + proper headers.
 =====================================================================
 """
 
@@ -11,32 +11,43 @@ import requests
 
 OUTPUT_JSON = "../data/article_urls.json"
 QUERY = "fraud"
-MAX_RESULTS = 200  # Adjust for more/less results
+MAX_PAGES = 5  # Fetch more pages if needed (each page has ~10 results)
+
+FINRA_API = "https://www.finra.org/api/search/all"
 
 
 def fetch_urls_api():
-    print("\n[+] Fetching FINRA URLs via Search API…\n")
+    print("\n[+] Fetching FINRA URLs via backend API…\n")
 
-    api_url = (
-        "https://www.finra.org/search-api/search-all"
-        f"?query={QUERY}&offset=0&limit={MAX_RESULTS}"
-    )
-
-    response = requests.get(api_url, timeout=20)
-
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"FINRA API request failed with status {response.status_code}"
-        )
-
-    data = response.json()
     urls = set()
 
-    for item in data.get("results", []):
-        url = item.get("url")
-        if url and url.startswith("http"):
-            urls.add(url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.finra.org/",
+    }
 
+    for page in range(1, MAX_PAGES + 1):
+        params = {"query": QUERY, "page": page}
+
+        r = requests.get(FINRA_API, headers=headers, params=params, timeout=20)
+
+        if r.status_code != 200:
+            print(f"[WARN] Page {page} failed with status {r.status_code}")
+            continue
+
+        data = r.json()
+
+        results = data.get("results", [])
+        if not results:
+            break  # No more pages
+
+        for item in results:
+            url = item.get("url")
+            if url and url.startswith("http"):
+                urls.add(url)
+
+    # Save results
     os.makedirs("../data", exist_ok=True)
     with open(OUTPUT_JSON, "w") as f:
         json.dump(list(urls), f, indent=4)
