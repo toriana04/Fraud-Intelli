@@ -2,13 +2,16 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
+from intellifraud_ui import inject_light_ui, sidebar_logo
 
 # ------------------------------------------------------------
 # PAGE CONFIG
 # ------------------------------------------------------------
-st.set_page_config(page_title="HOME", layout="wide")
+st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 
+# Inject global UI + sidebar logo
+inject_light_ui()
+sidebar_logo()
 
 # ------------------------------------------------------------
 # SEARCH HISTORY STATE
@@ -18,21 +21,24 @@ if "search_history" not in st.session_state:
 
 
 # ------------------------------------------------------------
-# HEADER
+# HEADER / HERO SECTION (LIGHT MODE)
 # ------------------------------------------------------------
 st.markdown("""
-<div style="text-align:center; margin-bottom:20px;">
-    <img src="https://i.imgur.com/lAVJ7Vx.png" width="360" style="border-radius:20px;"/>
+<div style="
+    padding: 30px; 
+    background: #F5F7FA; 
+    border-radius: 15px; 
+    border: 1px solid #E6E9EF; 
+    margin-bottom: 25px;
+">
+    <h1 style="margin-bottom: 0; color:#0A1A2F;">
+        🔍 Welcome to IntelliFraud
+    </h1>
+    <p style="font-size: 1.1rem; margin-top: 8px; color:#0A1A2F;">
+        Your interactive fraud intelligence dashboard for exploring regulatory actions,
+        trends, article insights, and key fraud definitions — all in one place.
+    </p>
 </div>
-
-<h1 style="text-align:center; color:#04d9ff; font-weight:900;">
-🔍 Welcome to IntelliFraud
-</h1>
-
-<p style="text-align:center; font-size:18px; max-width:700px; margin:auto;">
-Your interactive fraud intelligence dashboard for exploring regulatory actions, 
-fraud trends, article insights, and key definitions — all in one place.
-</p>
 """, unsafe_allow_html=True)
 
 
@@ -57,7 +63,7 @@ df = load_data()
 
 
 # ------------------------------------------------------------
-# TF-IDF MODEL
+# BUILD TF-IDF MODEL
 # ------------------------------------------------------------
 @st.cache_resource
 def build_tfidf():
@@ -88,14 +94,14 @@ st.subheader("🔎 Search Across IntelliFraud")
 
 query = st.text_input(
     "Ask a question or enter fraud-related keywords:",
-    placeholder="Try: 'AI fraud', 'investment scams', 'mail theft', 'older adults fraud'..."
+    placeholder="Try: 'investment fraud', 'mail theft', 'AI scams', 'identity fraud'..."
 )
 
 if query:
     # ------- Top Match -------
     article, score, all_scores = best_article_match(query)
 
-    # Save ONLY top result
+    # Save history
     st.session_state["search_history"].append({
         "query": query,
         "article_title": article["title"],
@@ -104,37 +110,38 @@ if query:
         "url": article["url"]
     })
 
-    # ------- Display Top Match -------
-    st.markdown("<h3 style='color:#04d9ff;'>Top Article Match</h3>", unsafe_allow_html=True)
+    # ------- Display Top Match (LIGHT MODE CARD) -------
+    st.markdown("""
+        <h3 style='color:#0A65FF;'>Top Article Match</h3>
+    """, unsafe_allow_html=True)
 
     st.markdown(f"""
     <div style="
-        background-color:#0e1117;
+        background-color:#FFFFFF;
         padding:18px; 
         margin-bottom:12px; 
         border-radius:12px; 
-        border:1px solid #04d9ff;
+        border:1px solid #E6E9EF;
+        box-shadow:0 1px 3px rgba(0,0,0,0.05);
     ">
-        <h3 style="color:#04d9ff;">{article['title']}</h3>
+        <h3 style="color:#0A1A2F;">{article['title']}</h3>
         <p>{article['summary']}</p>
         <p><strong>Keywords:</strong> {article['keywords']}</p>
         <p><strong>Similarity Score:</strong> {score:.2f}</p>
-        <a href="{article['url']}" target="_blank" style="color:#04d9ff;">
-            <strong>Read Article</strong>
+        <a href="{article['url']}" target="_blank" style="color:#0A65FF;">
+            <strong>Read Full Article →</strong>
         </a>
     </div>
     """, unsafe_allow_html=True)
 
+    
     # ------------------------------------------------------------
     # RELATED ARTICLES (Keyword-overlap filtered)
     # ------------------------------------------------------------
-    st.markdown("<h3 style='color:#04d9ff; margin-top:35px;'>Related Articles</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color:#0A65FF; margin-top:35px;'>Related Articles</h3>", unsafe_allow_html=True)
 
-    # Top article keywords
     top_keywords = set(article["keywords"].lower().replace(",", "").split())
-
-    # Get next best indices
-    top_indices = all_scores.argsort()[::-1][1:10]  # look at up to 10 to filter down
+    top_indices = all_scores.argsort()[::-1][1:10]
 
     related_shown = 0
 
@@ -146,30 +153,22 @@ if query:
         other_keywords = set(row["keywords"].lower().replace(",", "").split())
         overlap = top_keywords.intersection(other_keywords)
 
-        # Require at least 2 shared keywords
         if len(overlap) < 2:
             continue
 
-        # Limit to 3 related articles max
         if related_shown >= 3:
             break
 
         related_shown += 1
 
         st.markdown(f"""
-        <div style="
-            background-color:#0e1117; 
-            padding:16px; 
-            margin-top:12px;
-            border-radius:12px; 
-            border:1px solid #2b2b2b;
-        ">
-            <h4 style="color:#04d9ff; margin-bottom:4px;">{row['title']}</h4>
+        <div class="card">
+            <h4 style="margin-bottom:4px;">{row['title']}</h4>
             <p style="font-size:15px;">{row['summary'][:220]}...</p>
             <p><strong>Shared Keywords:</strong> {', '.join(overlap)}</p>
             <p><strong>Similarity Score:</strong> {score_val:.2f}</p>
-            <a href="{row['url']}" target="_blank" style="color:#04d9ff;">
-                <strong>Read Article</strong>
+            <a href="{row['url']}" target="_blank" style="color:#0A65FF;">
+                <strong>Read Article →</strong>
             </a>
         </div>
         """, unsafe_allow_html=True)
@@ -179,43 +178,33 @@ if query:
 
 
 # ------------------------------------------------------------
-# FEATURE CARDS
+# FEATURE CARDS (LIGHT MODE)
 # ------------------------------------------------------------
 st.subheader("📂 Navigate IntelliFraud")
 
 col1, col2, col3, col4 = st.columns(4)
 
-with col1:
-    st.markdown("""
-    <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff;">🧭 Fraud Explorer</h3>
-        <p>Browse fraud categories and matched articles.</p>
-    </div>
-    """, unsafe_allow_html=True)
+feature_cards = [
+    ("🧭 Fraud Explorer", "Browse categorized fraud articles and topics."),
+    ("📊 Fraud Trends", "Analyze keyword and fraud-type trends over time."),
+    ("📘 Fraud Glossary", "Understand key fraud definitions and financial terms."),
+    ("🔍 Article Search", "Find relevant articles using similarity scoring."),
+]
 
-with col2:
-    st.markdown("""
-    <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff;">📊 Fraud Trends</h3>
-        <p>View keyword patterns and activity over time.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown("""
-    <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff;">📘 Fraud Glossary</h3>
-        <p>Understand key fraud definitions and terms.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col4:
-    st.markdown("""
-    <div style="background-color:#0e1117; padding:18px; border-radius:12px; border:1px solid #04d9ff;">
-        <h3 style="color:#04d9ff;">🔍 Article Search</h3>
-        <p>Find relevant articles using similarity scoring.</p>
-    </div>
-    """, unsafe_allow_html=True)
+for col, (title, desc) in zip([col1, col2, col3, col4], feature_cards):
+    with col:
+        st.markdown(f"""
+        <div style="
+            background-color:#FFFFFF; 
+            padding:18px; 
+            border-radius:12px; 
+            border:1px solid #E6E9EF;
+            box-shadow:0 1px 3px rgba(0,0,0,0.05);
+        ">
+            <h3 style="color:#0A65FF;">{title}</h3>
+            <p>{desc}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------
@@ -224,13 +213,9 @@ with col4:
 st.subheader("📝 Your Search History")
 
 if st.button("🗑️ Clear Search History"):
-    if "search_history" in st.session_state:
-        del st.session_state["search_history"]
+    st.session_state["search_history"] = []
     st.success("Search history cleared!")
     st.rerun()
-
-if "search_history" not in st.session_state:
-    st.session_state["search_history"] = []
 
 history = st.session_state["search_history"]
 
@@ -251,26 +236,29 @@ else:
 
 
 # ------------------------------------------------------------
-# SIMILARITY SCORE EXPLANATION
+# SIMILARITY EXPLANATION (LIGHT MODE)
 # ------------------------------------------------------------
 st.markdown("""
 <hr>
-<h3 style="color:#04d9ff;">📈 What is a Similarity Score?</h3>
+<h3 style="color:#0A65FF;">📈 Understanding Similarity Scores</h3>
 
-<div style="background-color:#0e1117; padding:15px; border-radius:10px; border:1px solid #04d9ff;">
-<p style="font-size:16px;">
+<div style="
+    background-color:#FFFFFF; 
+    padding:15px; 
+    border-radius:10px; 
+    border:1px solid #E6E9EF;
+    box-shadow:0 1px 3px rgba(0,0,0,0.05);
+">
+<p style="font-size:16px; color:#0A1A2F;">
 Similarity scores measure how closely your query matches articles using TF-IDF and cosine similarity.
-Higher scores indicate more relevant matches.
+Higher scores indicate stronger relevance.
 </p>
 
-<ul style="font-size:16px;">
+<ul style="font-size:16px; color:#0A1A2F;">
 <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
 <li><strong>0.60 – 0.79:</strong> Strong match</li>
 <li><strong>0.40 – 0.59:</strong> Moderate match</li>
 <li><strong>0.00 – 0.39:</strong> Weak or unrelated</li>
 </ul>
-
 </div>
 """, unsafe_allow_html=True)
-
-
