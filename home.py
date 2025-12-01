@@ -22,7 +22,7 @@ if "search_history" not in st.session_state:
 # ------------------------------------------------------------
 st.markdown("""
 <div style="text-align:center; margin-bottom:20px;">
-    <img src="https://i.imgur.com/lAVJ7Vx.png" width="240" style="border-radius:20px;"/>
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="360" style="border-radius:20px;"/>
 </div>
 
 <h1 style="text-align:center; color:#04d9ff; font-weight:900;">
@@ -272,4 +272,5 @@ Higher scores indicate more relevant matches.
 
 </div>
 """, unsafe_allow_html=True)
+
 
