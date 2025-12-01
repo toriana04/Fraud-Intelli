@@ -27,8 +27,8 @@ st.set_page_config(
 #  LOAD ENVIRONMENT VARIABLES
 # =====================================================================
 load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("https://debqilwldhawthyjrlsh.supabase.co")
+SUPABASE_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlYnFpbHdsZGhhd3RoeWpybHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NDE4ODMsImV4cCI6MjA3NjIxNzg4M30.gsTqH9cQKjqOR6SZ81jN82DV4hMLTynjdDmvNrfH5uE")
 
 SUPABASE_BUCKET = "DTSC_project"
 SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
@@ -332,3 +332,4 @@ with tab4:
         </p>
     </div>
     """, unsafe_allow_html=True)
+
