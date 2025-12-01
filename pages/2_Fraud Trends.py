@@ -1,88 +1,121 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
+import io
+import os
+from dotenv import load_dotenv
+from supabase import create_client
 
-# ------------------------------------------
-# LOAD CSV
-# ------------------------------------------
+# Load environment variables
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = "DTSC_project"
+SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
+
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
+    sb = get_supabase()
+    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
+    df = pd.read_csv(io.BytesIO(file_bytes))
 
-    # Clean and standardize the timestamp
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce").dt.floor("D")
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["summary"] = df["summary"].astype(str)
+    df["keywords"] = df["keywords"].astype(str)
 
-    # Create daily date column
-    df["date"] = df["timestamp"].dt.date
+    return df
+# =====================================================================
+#                       2 — INTELLIFRAUD TRENDS
+# =====================================================================
 
-    # Clean keyword column (split comma-separated keywords)
-    df["keywords"] = df["keywords"].fillna("").apply(lambda x: [k.strip().lower() for k in x.split(",") if k.strip()])
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import io
+import os
+from dotenv import load_dotenv
+from supabase import create_client
 
+# Load environment variables
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = "DTSC_project"
+SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
+
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+@st.cache_data
+def load_data():
+    sb = get_supabase()
+    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
+    df = pd.read_csv(io.BytesIO(file_bytes))
+
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     return df
 
 df = load_data()
 
-st.title("📊 Fraud Intelli Analytics Dashboard")
+# Fraud categories
+FRAUD_TAGS = {
+    "AI Fraud": ["ai", "deepfake", "artificial intelligence"],
+    "Check Fraud": ["check fraud", "check washing"],
+    "Elder Fraud": ["older adult", "senior"],
+    "Account Takeover": ["account takeover", "hacked"],
+    "Investment Scam": ["crypto", "investment scam", "pump and dump"],
+    "Disaster Fraud": ["disaster", "relief scam"],
+    "General Fraud": ["fraud", "scam"]
+}
 
-st.markdown("### Explore trends in fraud-related articles using your scraped dataset.")
+def classify(text):
+    t = str(text).lower()
+    for tag, words in FRAUD_TAGS.items():
+        if any(w in t for w in words):
+            return tag
+    return "General Fraud"
 
-# ------------------------------------------
-# DAILY ARTICLE VOLUME
-# ------------------------------------------
-st.header("📅 Article Volume Over Time")
+df["tag"] = df["summary"].apply(classify)
+df["month"] = df["date"].dt.to_period("M")
 
-daily_counts = (
-    df.groupby("date")
-      .size()
-      .reset_index(name="count")
+# =====================================================================
+#                           PAGE UI
+# =====================================================================
+st.image("https://i.imgur.com/kIzoyP2.png", width=130)
+st.title("📈 IntelliFraud — Fraud Trends")
+
+st.write("Analyze fraud-related publication trends using FINRA article dates.")
+
+# =====================================================================
+#                       CHART 1 — MONTHLY COUNTS
+# =====================================================================
+monthly_counts = df.groupby("month").size().reset_index(name="count")
+monthly_counts["month"] = monthly_counts["month"].astype(str)
+
+fig1 = px.line(
+    monthly_counts,
+    x="month",
+    y="count",
+    title="Fraud Articles Per Month",
+    markers=True
 )
+st.plotly_chart(fig1, use_container_width=True)
 
-line_chart = (
-    alt.Chart(daily_counts)
-    .mark_line(point=True, strokeWidth=2)
-    .encode(
-        x=alt.X("date:T", title="Date"),
-        y=alt.Y("count:Q", title="Article Count"),
-        tooltip=["date", "count"]
-    )
-    .properties(height=350)
+# =====================================================================
+#                       CHART 2 — CATEGORY OVER TIME
+# =====================================================================
+cat_month = df.groupby(["month", "tag"]).size().reset_index(name="count")
+cat_month["month"] = cat_month["month"].astype(str)
+
+fig2 = px.line(
+    cat_month,
+    x="month",
+    y="count",
+    color="tag",
+    title="Fraud Categories Over Time"
 )
-
-st.altair_chart(line_chart, use_container_width=True)
-
-# ------------------------------------------
-# KEYWORD FREQUENCY TREND
-# ------------------------------------------
-st.header("🔥 Top Trending Fraud Keywords")
-
-# Turn list of keywords into individual rows
-keyword_rows = []
-
-for _, row in df.iterrows():
-    for kw in row["keywords"]:
-        keyword_rows.append({"date": row["date"], "keyword": kw})
-
-keyword_df = pd.DataFrame(keyword_rows)
-
-if not keyword_df.empty:
-    keyword_counts = (
-        keyword_df.groupby(["date", "keyword"])
-                  .size()
-                  .reset_index(name="count")
-    )
-
-    keyword_chart = (
-        alt.Chart(keyword_counts)
-        .mark_line(point=True)
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("count:Q", title="Keyword Count"),
-            color=alt.Color("keyword:N", title="Keyword"),
-            tooltip=["date", "keyword", "count"]
-        )
-        .properties(height=350)
-    )
-
-    st.altair_chart(keyword_chart, use_container_width=True)
-else:
-    st.info("No keyword data found in the CSV.")
+st.plotly_chart(fig2, use_container_width=True)
