@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import re
 
 # ------------------------------------------------------------
 # PAGE CONFIG
@@ -17,7 +16,7 @@ st.markdown("""
 </h1>
 
 <p style="text-align:center; font-size:18px;">
-Browse enforcement actions and regulatory alerts organized by fraud category.
+Explore regulatory enforcement articles organized by real-world fraud types.
 </p>
 """, unsafe_allow_html=True)
 
@@ -29,125 +28,116 @@ Browse enforcement actions and regulatory alerts organized by fraud category.
 def load_data():
     df = pd.read_csv("fraud_analysis_final.csv")
 
-    # Parse comma-separated keywords
+    # Parse keywords
     df["keywords"] = df["keywords"].fillna("").apply(
         lambda x: [k.strip().lower() for k in x.split(",") if k.strip()]
     )
-
     return df
 
 df = load_data()
 
+
 # ------------------------------------------------------------
-# CATEGORY DEFINITIONS — EXPANDED TERMS FOR BETTER MATCHING
+# FRAUD CATEGORIES — BUILT FROM YOUR REAL DATA
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
-        "investment", "investor", "advisor", "securities", "broker", "portfolio",
-        "offering", "private placement", "unregistered", "misleading"
+        "investment fraud", "investment scams", "investment scam", "investing",
+        "fraud investment", "fraud investors", "investment frauds", "invest ai",
+        "ai investment", "ai trading"
     ],
-    "Identity Theft": [
-        "identity", "impersonation", "personal information", "stolen identity", 
-        "fake id", "documents"
+    
+    "Financial Fraud": [
+        "financial fraud", "financial scam", "fraud recovering", "fraud recovery",
+        "fraud collaboration", "fighting fraud", "stop fraud", "fraud awareness",
+        "fraud findings", "fraud specialists", "fraud trends"
     ],
-    "Market Manipulation": [
-        "manipulation", "pump", "dump", "spoof", "false volume", "artificial price",
-        "market manipulation"
+
+    "Cyber & AI Fraud": [
+        "genai fraud", "accounts genai", "computer fraudsters", "fraudsters using",
+        "ai trading", "ai investment", "artificial fraud"
     ],
-    "Insider Trading": [
-        "insider", "non-public", "material info", "tipper", "tippee"
+
+    "Mail & Check Fraud": [
+        "check fraud", "stolen checks", "mail theft", "mail check", "mail fraud"
     ],
-    "Ponzi / Pyramid Schemes": [
-        "ponzi", "pyramid", "high yield", "guaranteed return", "recruiting"
-    ],
-    "Cyber Fraud": [
-        "phishing", "cyber", "breach", "hack", "malware", "email scam"
-    ],
-    "Money Laundering": [
-        "launder", "illicit funds", "conceal", "transfer", "wire"
-    ],
-    "Affinity Fraud": [
-        "church", "community", "group targeting", "affinity"
-    ],
+
     "Elder Fraud": [
-        "elder", "senior", "older adult", "exploitation"
+        "older adults", "increase fraud", "fraud exposure", "fraud risk"
     ],
-    "Account Takeover": [
-        "account takeover", "credential", "unauthorized access"
+
+    "Disaster & Emergency Fraud": [
+        "disaster fraud", "natural disasters", "disaster contribute"
+    ],
+
+    "Money Laundering": [
+        "money laundering", "laundering fraud", "laundering frauds", "illicit finance"
     ],
 }
 
+# Lowercase category keywords once
+for cat in FRAUD_CATEGORIES:
+    FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
+
 
 # ------------------------------------------------------------
-# SMART MATCHING FUNCTION
+# MATCHING FUNCTION
 # ------------------------------------------------------------
-def keyword_matches(article_kw, category_terms):
-    """
-    Returns the number of partial matches between article keywords and category keywords.
-    Partial match examples:
-    - "manipulation" matches "manipulate"
-    - "investment fraud" matches "investment"
-    - "phishing email" matches "phish"
-    """
+def match_score(article_keywords, category_keywords):
     score = 0
+    for a_kw in article_keywords:
+        for c_kw in category_keywords:
 
-    for a_kw in article_kw:
-        for c_kw in category_terms:
-
-            # Normalize
-            a = a_kw.lower()
-            c = c_kw.lower()
-
-            # Partial match
-            if c in a or a in c:
-                score += 1
-
-            # Regex root match (manipulate/manipulation)
-            if re.match(rf"{c[:-2]}", a):
+            # Phrase-in-keyword OR keyword-in-phrase match
+            if c_kw in a_kw or a_kw in c_kw:
                 score += 1
 
     return score
 
 
-def get_articles_by_category(category_name):
-    """Return articles matched to a category using smart scoring."""
-    terms = FRAUD_CATEGORIES[category_name]
+def get_articles(category_name):
+    """Return list of best-matching articles for a fraud category."""
+    cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
     for _, row in df.iterrows():
-        score = keyword_matches(row["keywords"], terms)
+        score = match_score(row["keywords"], cat_keywords)
         if score > 0:
             results.append((score, row))
 
-    # Sort best match first
+    # Best match first
     results.sort(key=lambda x: x[0], reverse=True)
 
     return [row for score, row in results]
 
 
 # ------------------------------------------------------------
-# CATEGORY UI
+# UI — CATEGORY PICKER
 # ------------------------------------------------------------
 st.subheader("🧭 Select a Fraud Category")
 
-category = st.selectbox(
-    "Choose a category:",
-    list(FRAUD_CATEGORIES.keys()),
-    index=0
+selected_category = st.selectbox(
+    "Choose a category to explore:",
+    list(FRAUD_CATEGORIES.keys())
 )
 
-st.markdown(f"<h2 style='color:#04d9ff;'>📂 {category}</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='color:#04d9ff;'>📂 {selected_category}</h2>", unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------
-# RETURN MATCHING ARTICLES
+# DISPLAY MATCHING ARTICLES
 # ------------------------------------------------------------
-articles = get_articles_by_category(category)
+articles = get_articles(selected_category)
 
 if not articles:
-    st.warning("No articles matched — try expanding your keyword list or broadening categories.")
+    st.warning("No matching articles found for this category yet.")
 else:
     for row in articles:
+        title = row["title"]
+        summary = row["summary"]
+        url = row["url"]
+        keywords = ", ".join(row["keywords"])
+
         st.markdown(f"""
         <div style="
             background-color:#0e1117; 
@@ -156,9 +146,9 @@ else:
             border-radius:12px; 
             border:1px solid #04d9ff;
         ">
-            <h3 style="color:#04d9ff;">{row['title']}</h3>
-            <p>{row['summary']}</p>
-            <p><strong>Keywords:</strong> {", ".join(row['keywords'])}</p>
-            <a href="{row['url']}" target="_blank" style="color:#04d9ff;"><strong>Read Full Article</strong></a>
+            <h3 style="color:#04d9ff;">{title}</h3>
+            <p>{summary}</p>
+            <p><strong>Keywords:</strong> {keywords}</p>
+            <a href="{url}" target="_blank" style="color:#04d9ff;"><strong>Read Full Article</strong></a>
         </div>
         """, unsafe_allow_html=True)
