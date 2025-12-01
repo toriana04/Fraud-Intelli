@@ -167,12 +167,16 @@ with col4:
 # ------------------------------------------------------------
 st.subheader("📝 Your Search History")
 
-# Clear history button
+# Clear history button (full reset)
 if st.button("🗑️ Clear Search History"):
     if "search_history" in st.session_state:
         del st.session_state["search_history"]
     st.success("Search history cleared!")
     st.rerun()
+
+# Recreate empty list if key was deleted
+if "search_history" not in st.session_state:
+    st.session_state["search_history"] = []
 
 history = st.session_state["search_history"]
 
@@ -183,7 +187,6 @@ else:
 
     st.dataframe(hist_df, use_container_width=True)
 
-    # Create CSV for download
     csv_data = hist_df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
@@ -220,4 +223,5 @@ the same method used in many modern search engines.
 </p>
 </div>
 """, unsafe_allow_html=True)
+
 
