@@ -1,7 +1,7 @@
 [theme]
-base = "dark"
-primaryColor = "#00F2FF"
-backgroundColor = "#0A0F24"
-secondaryBackgroundColor = "#11172B"
-textColor = "#FFFFFF"
-font = "sans serif"
+base="light"
+primaryColor="#0072CE"                # Clean finance blue
+backgroundColor="#FFFFFF"             # Pure white
+secondaryBackgroundColor="#F3F6FB"    # Soft light gray-blue
+textColor="#1A1A1A"                   # Dark charcoal
+font="sans serif"
