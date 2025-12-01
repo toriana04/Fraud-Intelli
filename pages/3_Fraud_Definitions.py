@@ -1,58 +1,49 @@
 import streamlit as st
 import pandas as pd
-import io
-import os
-from dotenv import load_dotenv
-from supabase import create_client
 
-# Load environment variables
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_BUCKET = "DTSC_project"
-SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
-
-@st.cache_resource
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+st.set_page_config(page_title="IntelliFraud", layout="wide")
 
 @st.cache_data
 def load_data():
-    sb = get_supabase()
-    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
-    df = pd.read_csv(io.BytesIO(file_bytes))
-
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["summary"] = df["summary"].astype(str)
-    df["keywords"] = df["keywords"].astype(str)
-
+    df = pd.read_csv("fraud_analysis_final.csv")
     return df
-# =====================================================================
-#                   3 — INTELLIFRAUD FRAUD DEFINITIONS
-# =====================================================================
 
-import streamlit as st
+df = load_data()
 
-st.image("https://i.imgur.com/kIzoyP2.png", width=130)
-st.title("📘 Fraud Definitions")
+st.title("🔍 IntelliFraud — Fraud Intelligence Dashboard")
 
 st.write("""
-This page provides concise definitions of common fraud types
-based on patterns identified in FINRA publications.
+Welcome to IntelliFraud, your centralized hub for fraud insights, trends, and enforcement actions.
+Use the sidebar navigation to explore more.
 """)
 
-definitions = {
-    "AI Fraud": "Scams that leverage artificial intelligence, deepfakes, voice cloning, or automated impersonation.",
-    "Check Fraud": "Altering, stealing, or washing checks to illegally cash or deposit funds.",
-    "Elder Fraud": "Fraud schemes that intentionally target seniors or older adults.",
-    "Account Takeover": "Unauthorized access to a victim's financial or personal accounts.",
-    "Investment Scam": "Fraudulent investment opportunities, including cryptocurrency schemes and pump-and-dump operations.",
-    "Disaster Fraud": "Scams exploiting natural disasters, relief programs, or emergency assistance.",
-    "General Fraud": "Any deceptive or misleading activity intended to steal money or information."
-}
+st.metric("Total Articles", len(df))
 
-for name, desc in definitions.items():
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown(f"### {name}")
-    st.write(desc)
-    st.markdown("</div>", unsafe_allow_html=True)
+if "article_date" in df.columns:
+    st.write("### Recent Articles")
+    st.dataframe(df.sort_values("article_date", ascending=False).head(10))
+else:
+    st.write("### Sample of Articles")
+    st.dataframe(df.head(10))
+
+import streamlit as st
+import pandas as pd
+
+st.title("📘 Fraud Definitions")
+
+@st.cache_data
+def load_data():
+    df = pd.read_csv("fraud_analysis_final.csv")
+    return df
+
+df = load_data()
+
+if "fraud_type" in df.columns:
+    fraud_types = sorted(df["fraud_type"].dropna().unique())
+    selected = st.selectbox("Select fraud category:", fraud_types)
+
+    filtered = df[df["fraud_type"] == selected]
+    st.write(f"### {len(filtered)} Articles")
+    st.dataframe(filtered)
+else:
+    st.info("This dataset does not contain fraud categories. Definitions will be added later.")
