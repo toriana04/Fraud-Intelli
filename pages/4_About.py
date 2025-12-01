@@ -1,52 +1,39 @@
 import streamlit as st
 import pandas as pd
-import io
-import os
-from dotenv import load_dotenv
-from supabase import create_client
 
-# Load environment variables
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_BUCKET = "DTSC_project"
-SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
-
-@st.cache_resource
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+st.set_page_config(page_title="IntelliFraud", layout="wide")
 
 @st.cache_data
 def load_data():
-    sb = get_supabase()
-    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
-    df = pd.read_csv(io.BytesIO(file_bytes))
-
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["summary"] = df["summary"].astype(str)
-    df["keywords"] = df["keywords"].astype(str)
-
+    df = pd.read_csv("fraud_analysis_final.csv")
     return df
-# =====================================================================
-#                       4 — ABOUT INTELLIFRAUD
-# =====================================================================
 
+df = load_data()
+
+st.title("🔍 IntelliFraud — Fraud Intelligence Dashboard")
+
+st.write("""
+Welcome to IntelliFraud, your centralized hub for fraud insights, trends, and enforcement actions.
+Use the sidebar navigation to explore more.
+""")
+
+st.metric("Total Articles", len(df))
+
+if "article_date" in df.columns:
+    st.write("### Recent Articles")
+    st.dataframe(df.sort_values("article_date", ascending=False).head(10))
+else:
+    st.write("### Sample of Articles")
+    st.dataframe(df.head(10))
 import streamlit as st
 
-st.image("https://i.imgur.com/kIzoyP2.png", width=150)
 st.title("ℹ️ About IntelliFraud")
 
-st.markdown("""
-IntelliFraud is an AI-powered fraud intelligence engine developed by:
+st.write("""
+IntelliFraud is an interactive fraud intelligence dashboard designed to help users explore
+regulatory actions, fraud trends, and enforcement insights.
 
-- Clara Belluci  
-- Troy Benner  
-- Hoang Bui  
-- Tori-Ana McNeil  
+This tool is powered by publicly available data and built with Streamlit.
 
-for the UNC Charlotte School of Data Science in partnership with USAA.
-
-The system integrates a hybrid Selenium + Playwright web scraper,
-Supabase cloud storage, NLP summarization, semantic search, and
-a multi-page Streamlit dashboard.
+Created by Clara Belluci, Troy Brenner, Hoang Bui, and Tori-Ana McNeil in collaboration with the UNCC School of Data Science and USAA.
 """)
