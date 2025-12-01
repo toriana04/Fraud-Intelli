@@ -1,121 +1,98 @@
 import streamlit as st
 import pandas as pd
-import io
-import os
-from dotenv import load_dotenv
-from supabase import create_client
+import altair as alt
 
-# Load environment variables
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_BUCKET = "DTSC_project"
-SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
+# ---------------------------------------------
+# PAGE CONFIG & HEADER
+# ---------------------------------------------
+st.set_page_config(page_title="Fraud Trends", layout="wide")
 
-@st.cache_resource
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+st.markdown("""
+<div style="text-align:center; margin-bottom:10px;">
+    <img src="https://i.imgur.com/kIzoyP2.png" width="140" style="border-radius:20px;"/>
+</div>
+<h1 style="text-align:center; color:#04d9ff; font-weight:900;">📊 Fraud Trends & Analytics</h1>
+<p style="text-align:center; font-size:18px;">
+Explore trends in fraud-related articles, keyword frequencies, and historical patterns.
+</p>
+""", unsafe_allow_html=True)
 
+# ---------------------------------------------
+# LOAD DATA
+# ---------------------------------------------
 @st.cache_data
 def load_data():
-    sb = get_supabase()
-    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
-    df = pd.read_csv(io.BytesIO(file_bytes))
+    df = pd.read_csv("fraud_analysis_final.csv")
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["summary"] = df["summary"].astype(str)
-    df["keywords"] = df["keywords"].astype(str)
+    # Convert timestamp to datetime
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    return df
-# =====================================================================
-#                       2 — INTELLIFRAUD TRENDS
-# =====================================================================
+    # Clean keywords: convert comma-separated strings into lists
+    df["keywords"] = df["keywords"].fillna("").apply(lambda x: [k.strip().lower() for k in x.split(",") if k.strip()])
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import io
-import os
-from dotenv import load_dotenv
-from supabase import create_client
-
-# Load environment variables
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_BUCKET = "DTSC_project"
-SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
-
-@st.cache_resource
-def get_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-@st.cache_data
-def load_data():
-    sb = get_supabase()
-    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
-    df = pd.read_csv(io.BytesIO(file_bytes))
-
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
     return df
 
 df = load_data()
 
-# Fraud categories
-FRAUD_TAGS = {
-    "AI Fraud": ["ai", "deepfake", "artificial intelligence"],
-    "Check Fraud": ["check fraud", "check washing"],
-    "Elder Fraud": ["older adult", "senior"],
-    "Account Takeover": ["account takeover", "hacked"],
-    "Investment Scam": ["crypto", "investment scam", "pump and dump"],
-    "Disaster Fraud": ["disaster", "relief scam"],
-    "General Fraud": ["fraud", "scam"]
-}
+# ---------------------------------------------
+# SECTION 1: Monthly Article Trend
+# ---------------------------------------------
+st.subheader("📅 Articles Published Over Time")
 
-def classify(text):
-    t = str(text).lower()
-    for tag, words in FRAUD_TAGS.items():
-        if any(w in t for w in words):
-            return tag
-    return "General Fraud"
-
-df["tag"] = df["summary"].apply(classify)
-df["month"] = df["date"].dt.to_period("M")
-
-# =====================================================================
-#                           PAGE UI
-# =====================================================================
-st.image("https://i.imgur.com/kIzoyP2.png", width=130)
-st.title("📈 IntelliFraud — Fraud Trends")
-
-st.write("Analyze fraud-related publication trends using FINRA article dates.")
-
-# =====================================================================
-#                       CHART 1 — MONTHLY COUNTS
-# =====================================================================
-monthly_counts = df.groupby("month").size().reset_index(name="count")
-monthly_counts["month"] = monthly_counts["month"].astype(str)
-
-fig1 = px.line(
-    monthly_counts,
-    x="month",
-    y="count",
-    title="Fraud Articles Per Month",
-    markers=True
+monthly = (
+    df.groupby(df["timestamp"].dt.to_period("M"))
+      .size()
+      .reset_index(name="count")
 )
-st.plotly_chart(fig1, use_container_width=True)
 
-# =====================================================================
-#                       CHART 2 — CATEGORY OVER TIME
-# =====================================================================
-cat_month = df.groupby(["month", "tag"]).size().reset_index(name="count")
-cat_month["month"] = cat_month["month"].astype(str)
+monthly["timestamp"] = monthly["timestamp"].astype(str)
 
-fig2 = px.line(
-    cat_month,
-    x="month",
-    y="count",
-    color="tag",
-    title="Fraud Categories Over Time"
+line_chart = (
+    alt.Chart(monthly)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("timestamp:N", title="Month"),
+        y=alt.Y("count:Q", title="Number of Articles"),
+        tooltip=["timestamp", "count"]
+    )
+    .properties(width="container", height=350)
 )
-st.plotly_chart(fig2, use_container_width=True)
+
+st.altair_chart(line_chart, use_container_width=True)
+
+# ---------------------------------------------
+# SECTION 2: Keyword Frequency Bar Chart
+# ---------------------------------------------
+st.subheader("🔑 Most Common Fraud Keywords")
+
+# Flatten keyword lists into one long list
+all_keywords = [kw for lst in df["keywords"] for kw in lst]
+
+keyword_freq = (
+    pd.Series(all_keywords)
+    .value_counts()
+    .reset_index()
+)
+
+keyword_freq.columns = ["keyword", "count"]
+
+# Bar chart (top 20)
+bar_chart = (
+    alt.Chart(keyword_freq.head(20))
+    .mark_bar()
+    .encode(
+        x=alt.X("count:Q", title="Frequency"),
+        y=alt.Y("keyword:N", sort="-x", title="Keyword"),
+        tooltip=["keyword", "count"]
+    )
+    .properties(height=500)
+)
+
+st.altair_chart(bar_chart, use_container_width=True)
+
+# ---------------------------------------------
+# SECTION 3: Top Keywords Table
+# ---------------------------------------------
+st.subheader("🏆 Top Fraud Keywords (Full List)")
+
+st.dataframe(keyword_freq, use_container_width=True)
