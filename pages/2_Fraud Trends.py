@@ -9,7 +9,7 @@ st.set_page_config(page_title="Fraud Trends", layout="wide")
 
 st.markdown("""
 <div style="text-align:center; margin-bottom:10px;">
-    <img src="https://i.imgur.com/kIzoyP2.png" width="140" style="border-radius:20px;"/>
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="140" style="border-radius:20px;"/>
 </div>
 <h1 style="text-align:center; color:#04d9ff; font-weight:900;">📊 Fraud Trends & Analytics</h1>
 <p style="text-align:center; font-size:18px;">
@@ -146,3 +146,4 @@ for idx, row in keyword_freq.iterrows():
         </p>
     </div>
     """, unsafe_allow_html=True)
+
