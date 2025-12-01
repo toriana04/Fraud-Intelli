@@ -82,7 +82,7 @@ def best_article_match(query):
 
 
 # ------------------------------------------------------------
-# SEARCH BAR (MATCH ARTICLES ONLY)
+# SEARCH BAR
 # ------------------------------------------------------------
 st.subheader("🔎 Search Across IntelliFraud")
 
@@ -92,9 +92,10 @@ query = st.text_input(
 )
 
 if query:
+    # Top match
     article, score = best_article_match(query)
 
-    # Save search entry to history (INCLUDING KEYWORDS)
+    # Save ONLY the top match to history
     st.session_state["search_history"].append({
         "query": query,
         "article_title": article["title"],
@@ -103,6 +104,9 @@ if query:
         "url": article["url"]
     })
 
+    # ------------------------------------------------------------
+    # DISPLAY TOP MATCH
+    # ------------------------------------------------------------
     st.markdown("<h3 style='color:#04d9ff;'>Top Article Match</h3>", unsafe_allow_html=True)
 
     st.markdown(f"""
@@ -120,6 +124,36 @@ if query:
         <a href="{article['url']}" target="_blank" style="color:#04d9ff;"><strong>Read Article</strong></a>
     </div>
     """, unsafe_allow_html=True)
+
+    # ------------------------------------------------------------
+    # RELATED ARTICLES SECTION
+    # ------------------------------------------------------------
+    st.markdown("<h3 style='color:#04d9ff; margin-top:35px;'>Related Articles</h3>", unsafe_allow_html=True)
+
+    query_vec = vectorizer.transform([query.lower()])
+    all_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
+
+    top_indices = all_scores.argsort()[::-1][1:4]  # next 3 matches
+
+    for idx in top_indices:
+        row = df.iloc[idx]
+        score = all_scores[idx]
+
+        st.markdown(f"""
+        <div style="
+            background-color:#0e1117; 
+            padding:16px; 
+            margin-top:12px;
+            border-radius:12px; 
+            border:1px solid #2b2b2b;
+        ">
+            <h4 style="color:#04d9ff; margin-bottom:4px;">{row['title']}</h4>
+            <p style="font-size:15px;">{row['summary'][:220]}...</p>
+            <p><strong>Keywords:</strong> {row['keywords']}</p>
+            <p><strong>Similarity Score:</strong> {score:.2f}</p>
+            <a href="{row['url']}" target="_blank" style="color:#04d9ff;"><strong>Read Article</strong></a>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------
@@ -163,18 +197,18 @@ with col4:
 
 
 # ------------------------------------------------------------
-# SEARCH HISTORY SECTION
+# SEARCH HISTORY
 # ------------------------------------------------------------
 st.subheader("📝 Your Search History")
 
-# Clear history button (full reset)
+# Clear history (delete key fully)
 if st.button("🗑️ Clear Search History"):
     if "search_history" in st.session_state:
         del st.session_state["search_history"]
     st.success("Search history cleared!")
     st.rerun()
 
-# Recreate empty list if key was deleted
+# Reinitialize if deleted
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
@@ -184,7 +218,6 @@ if len(history) == 0:
     st.info("No searches yet. Try searching for something above!")
 else:
     hist_df = pd.DataFrame(history)
-
     st.dataframe(hist_df, use_container_width=True)
 
     csv_data = hist_df.to_csv(index=False).encode("utf-8")
@@ -223,6 +256,3 @@ the same method used in many modern search engines.
 </p>
 </div>
 """, unsafe_allow_html=True)
-
-
-
