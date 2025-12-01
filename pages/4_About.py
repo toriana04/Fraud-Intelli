@@ -34,7 +34,7 @@ This dashboard is powered by publicly available data and built with <strong>Stre
 </p>
 
 <p style="font-size:18px; line-height:1.6;">
-Created by <strong>Clara Belluci</strong>, <strong>Troy Brenner</strong>, <strong>Hoang Bui</strong>, and <strong>Tori-Ana McNeil</strong> 
+Created by <strong>Clara Belluci</strong>, <strong>Troy Benner</strong>, <strong>Hoang Bui</strong>, and <strong>Tori-Ana McNeil</strong> 
 in collaboration with the <strong>UNC Charlotte School of Data Science</strong> and <strong>USAA</strong>.
 </p>
 
@@ -49,4 +49,5 @@ st.markdown("""
 This project is intended for educational and analytical purposes only.
 </div>
 """, unsafe_allow_html=True)
+
 
