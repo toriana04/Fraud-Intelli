@@ -21,20 +21,23 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r scraper/requirements.txt
           python -m playwright install --with-deps chromium
 
-      - name: Create environment variables
-        run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
+      # REMOVE the old Create environment variables step
 
       - name: Run FINRA API URL Discovery
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           cd scraper
           python fetch_urls_api.py
 
       - name: Run Playwright Article Extractor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           cd scraper
           python playwright_extract_articles.py
