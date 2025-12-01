@@ -94,10 +94,11 @@ query = st.text_input(
 if query:
     article, score = best_article_match(query)
 
-    # Save search entry to history
+    # Save search entry to history (INCLUDING KEYWORDS)
     st.session_state["search_history"].append({
         "query": query,
         "article_title": article["title"],
+        "keywords": article["keywords"],
         "similarity_score": round(score, 4),
         "url": article["url"]
     })
