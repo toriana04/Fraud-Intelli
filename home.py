@@ -1,207 +1,334 @@
+# =====================================================================
+#                           INTELLIFRAUD APP
+#      Supabase-Powered AI Fraud Intelligence & Search Platform
+# =====================================================================
+
 import streamlit as st
 import pandas as pd
-import numpy as np
+import torch
 import time
-from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
+import io
+import os
+from dotenv import load_dotenv
+from supabase import create_client
+from sentence_transformers import SentenceTransformer, util
+from transformers import pipeline
 
-# ------------------------------------------------------
-# PAGE CONFIG
-# ------------------------------------------------------
+# =====================================================================
+#  STREAMLIT PAGE CONFIG
+# =====================================================================
 st.set_page_config(
-    page_title="Fraud Intelli Search",
-    page_icon="🔍",
+    page_title="IntelliFraud",
+    page_icon="🛡️",
     layout="wide"
 )
 
-# ------------------------------------------------------
-# BRANDING HEADER
-# ------------------------------------------------------
+# =====================================================================
+#  LOAD ENVIRONMENT VARIABLES
+# =====================================================================
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+SUPABASE_BUCKET = "DTSC_project"
+SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
+
+# =====================================================================
+#  INTELLIFRAUD PREMIUM NEON DARK THEME
+# =====================================================================
 st.markdown("""
-<div style="text-align:center; margin-bottom:20px;">
-    <img src="https://i.imgur.com/kIzoyP2.png" width="180" style="border-radius:20px;"/>
-</div>
-<h1 style="text-align:center; color:#04d9ff; font-weight:900;">
-🔍 Fraud Intelli Search Engine
-</h1>
-<p style="text-align:center; color:#cccccc; font-size:18px;">
-Search, explore, and analyze FINRA fraud-related articles using AI-powered semantic matching.
-</p>
+<style>
+
+.main, .reportview-container {
+    background-color: #0A0F24 !important;
+    color: #FFFFFF !important;
+}
+
+section[data-testid="stSidebar"] {
+    background-color: #11172B !important;
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+section[data-testid="stSidebar"] * {
+    color: #D6E2FF !important;
+}
+
+h1, h2, h3, h4 {
+    color: #00F2FF !important;
+    font-weight: 800 !important;
+}
+
+.stButton>button {
+    background: linear-gradient(90deg, #8A2BE2, #00F2FF);
+    color: white !important;
+    border-radius: 8px;
+    border: none;
+    padding: 0.6rem 1.3rem;
+    font-weight: 700;
+    font-size: 16px;
+}
+.stButton>button:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+    transition: 0.2s ease;
+}
+
+.stTextInput>div>div>input,
+.stTextArea textarea {
+    background-color: #121A2E;
+    color: white !important;
+    border: 1px solid #8A2BE2 !important;
+    border-radius: 6px;
+}
+
+.card {
+    background: rgba(255,255,255,0.07);
+    padding: 22px;
+    margin-bottom: 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(10px);
+}
+
+.keyword-chip {
+    background: rgba(138, 43, 226, 0.25);
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 3px;
+    border-radius: 12px;
+    border: 1px solid #8A2BE2;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# ------------------------------------------------------
-# LOAD DATA
-# ------------------------------------------------------
+# =====================================================================
+#  SPINNER ANIMATION
+# =====================================================================
+st.markdown("""
+<style>
+@keyframes spinpulse {
+  0% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 0 #00F2FF); }
+  50% { transform: rotate(180deg) scale(1.06); filter: drop-shadow(0 0 15px #00F2FF); }
+  100% { transform: rotate(360deg) scale(1); filter: drop-shadow(0 0 0 #00F2FF); }
+}
+.spinner-premium {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.spinner-logo-premium {
+    width: 130px;
+    animation: spinpulse 2.4s infinite ease-in-out;
+}
+</style>
+""", unsafe_allow_html=True)
+
+def show_spinner(text="IntelliFraud is analyzing…"):
+    st.markdown(f"<h4 style='text-align:center;color:#8A2BE2;'>{text}</h4>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class='spinner-premium'>
+            <img src='https://i.imgur.com/kIzoyP2.png' class='spinner-logo-premium'>
+        </div>
+    """, unsafe_allow_html=True)
+
+# =====================================================================
+#  SUPABASE FUNCTIONS
+# =====================================================================
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
+    sb = get_supabase()
+    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
 
-    # Clean keywords into list format
-    df["keyword_list"] = df["keywords"].fillna("").str.split(",")
-    df["keyword_list"] = df["keyword_list"].apply(
-        lambda lst: [k.strip() for k in lst if k.strip()]
-    )
-
-    # Convert timestamp → datetime
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = pd.read_csv(io.BytesIO(file_bytes))
     
+    # Normalize types
+    df["summary"] = df["summary"].astype(str)
+    df["keywords"] = df["keywords"].astype(str)
+    df["date"] = df["date"].astype(str)
+
     return df
 
+# =====================================================================
+#  LOAD MODELS
+# =====================================================================
+show_spinner("Loading IntelliFraud NLP Models...")
+@st.cache_resource
+def load_models():
+    embed = SentenceTransformer("all-MiniLM-L6-v2")
+    explain = pipeline("text2text-generation", model="google/flan-t5-small")
+    return embed, explain
+
+embed_model, explain_model = load_models()
+
+# Load article data
+show_spinner("Loading Fraud Articles from Supabase...")
 df = load_data()
+summary_embeddings = embed_model.encode(df["summary"].tolist(), convert_to_tensor=True)
 
-# ------------------------------------------------------
-# LOAD EMBEDDING MODEL
-# ------------------------------------------------------
-@st.cache_resource
-def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+# =====================================================================
+#  FRAUD TAGGING LOGIC
+# =====================================================================
+FRAUD_TAGS = {
+    "AI Fraud": ["ai", "deepfake", "artificial intelligence"],
+    "Check Fraud": ["check fraud", "check washing"],
+    "Elder Fraud": ["older adult", "senior"],
+    "Account Takeover": ["account takeover", "hacked"],
+    "Investment Scam": ["crypto", "investment scam", "pump and dump"],
+    "Disaster Fraud": ["disaster", "relief scam"],
+    "General Fraud": ["fraud", "scam"]
+}
 
-model = load_model()
+def classify(text):
+    t = text.lower()
+    for tag, words in FRAUD_TAGS.items():
+        if any(w in t for w in words):
+            return tag
+    return "General Fraud"
 
-# ------------------------------------------------------
-# PRECOMPUTE ARTICLE EMBEDDINGS
-# ------------------------------------------------------
-@st.cache_resource
-def embed_articles(df):
-    summaries = df["summary"].fillna("").tolist()
-    return model.encode(summaries, convert_to_tensor=False)
+df["tag"] = df["summary"].apply(classify)
 
-article_embeddings = embed_articles(df)
+# =====================================================================
+#  SIDEBAR CONTENT
+# =====================================================================
+st.sidebar.image("https://i.imgur.com/kIzoyP2.png", width=130)
+st.sidebar.header("🧭 IntelliFraud Menu")
 
-# ------------------------------------------------------
-# SEARCH BAR WITH SEMANTIC SUGGESTIONS
-# ------------------------------------------------------
-st.markdown("## 🔎 Search Articles")
+# Search history
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-col1, col2 = st.columns([4, 1])
+st.sidebar.subheader("Search History")
+if st.session_state.history:
+    for q in st.session_state.history[-10:]:
+        st.sidebar.write(f"• {q}")
+else:
+    st.sidebar.write("No searches yet.")
 
-with col1:
-    query = st.text_input(
-        "Enter your search query:",
-        placeholder="e.g., investment fraud, AI scams, recovery fraud...",
-    )
+if st.sidebar.button("Clear History"):
+    st.session_state.history = []
+    st.sidebar.success("History cleared.")
 
-with col2:
-    search_btn = st.button("Search", use_container_width=True)
+fraud_filter = st.sidebar.selectbox("Filter by Fraud Category", ["All"] + list(FRAUD_TAGS.keys()))
 
-# Dynamic suggestions
-def get_suggestions(text):
-    if not text:
-        return []
-    pool = list({kw for lst in df["keyword_list"] for kw in lst})
-    return [kw for kw in pool if text.lower() in kw.lower()][:8]
+# =====================================================================
+#  TABS
+# =====================================================================
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["🔎 IntelliFraud Search", "🤖 AI Explain", "⚖️ Compare", "📚 About"]
+)
 
-if query:
-    suggestions = get_suggestions(query)
-    if suggestions:
-        st.markdown("### 🔮 Suggestions:")
-        for s in suggestions:
-            if st.button(s, key=f"sug_{s}"):
-                query = s
+# =====================================================================
+#  TAB 1 — SEARCH
+# =====================================================================
+with tab1:
+    st.image("https://i.imgur.com/kIzoyP2.png", width=150)
+    st.markdown("<h1 style='text-align:center;'>IntelliFraud Search Engine</h1>", unsafe_allow_html=True)
 
-st.markdown("---")
+    query = st.text_input("Search for a fraud topic, article summary, or pattern:")
 
+    if query:
+        st.session_state.history.append(query)
 
-# ------------------------------------------------------
-# RUN SEMANTIC SEARCH
-# ------------------------------------------------------
-if search_btn and query:
+        with st.spinner("Searching…"):
+            q_emb = embed_model.encode(query, convert_to_tensor=True)
+            sims = util.cos_sim(q_emb, summary_embeddings)[0]
+            best_idx = torch.argmax(sims).item()
+            best_score = float(sims[best_idx])
+            best = df.iloc[best_idx]
 
-    with st.spinner("🔎 Analyzing articles with AI… please wait..."):
-        time.sleep(1)
+        if fraud_filter != "All" and best["tag"] != fraud_filter:
+            st.info(f"No direct match for '{fraud_filter}'. Showing closest overall result.")
 
-        # Encode query
-        q_embedding = model.encode([query])[0]
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown(f"### 🏆 Best Match: **{best['title']}**")
+        st.write(f"📅 **Published:** `{best['date']}`")
+        st.write(f"🔗 [Read Article]({best['url']})")
+        st.write(f"📊 **Relevance Score:** `{best_score:.4f}`")
+        st.write(f"🏷 **Category:** `{best['tag']}`")
 
-        # Compute similarity scores
-        sims = cosine_similarity([q_embedding], article_embeddings)[0]
-        df["similarity"] = sims
+        st.markdown("### Summary")
+        st.write(best["summary"])
 
-        # Top result
-        best = df.sort_values("similarity", ascending=False).iloc[0]
+        st.markdown("### Keywords")
+        for kw in best["keywords"].split(","):
+            st.markdown(f"<span class='keyword-chip'>{kw.strip()}</span>", unsafe_allow_html=True)
 
-    # ------------------------------------------------------
-    # DISPLAY TOP MATCHING ARTICLE
-    # ------------------------------------------------------
-    st.markdown("## 📄 Top Matching Article")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Format date
-    if pd.notnull(best["timestamp"]):
-        published_date = best["timestamp"].strftime("%B %d, %Y")
-    else:
-        published_date = "Unknown"
+# =====================================================================
+#  TAB 2 — AI EXPLAIN
+# =====================================================================
+with tab2:
+    st.image("https://i.imgur.com/kIzoyP2.png", width=150)
+    st.markdown("<h1 style='text-align:center;'>Explain a Fraud Concept</h1>", unsafe_allow_html=True)
 
-    top_article_html = f"""
-    <div style="padding:20px; background:#111; border-radius:12px;">
-        <h2 style="color:#04d9ff;">{best['title']}</h2>
-        <p style="color:#ccc;">{best['summary']}</p>
-        <p><b style="color:#04d9ff;">Published:</b> {published_date}</p>
-        <p><b style="color:#04d9ff;">Keywords:</b> {best["keywords"]}</p>
-        <a href="{best['url']}" target="_blank" 
-           style="color:#00eaff; font-size:18px; font-weight:bold; text-decoration:none;">
-           🔗 Read Full Article
-        </a>
+    explain_input = st.text_area("Paste an article snippet, scam description, or fraud pattern:")
+
+    if st.button("Generate Explanation"):
+        with st.spinner("Generating explanation…"):
+            out = explain_model(
+                f"Explain this fraud concept in simple terms: {explain_input}",
+                max_length=180
+            )[0]["generated_text"]
+
+        st.success(out)
+
+# =====================================================================
+#  TAB 3 — COMPARE
+# =====================================================================
+with tab3:
+    st.image("https://i.imgur.com/kIzoyP2.png", width=150)
+    st.markdown("<h1 style='text-align:center;'>Compare Two Articles</h1>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        a1 = st.selectbox("Select first article", df["title"].tolist())
+    with col2:
+        a2 = st.selectbox("Select second article", df["title"].tolist())
+
+    if st.button("Compare Articles"):
+        article1 = df[df["title"] == a1].iloc[0]
+        article2 = df[df["title"] == a2].iloc[0]
+
+        e1 = embed_model.encode(article1["summary"], convert_to_tensor=True)
+        e2 = embed_model.encode(article2["summary"], convert_to_tensor=True)
+        sim = float(util.cos_sim(e1, e2)[0][0])
+
+        st.write(f"### Similarity Score: `{sim:.4f}`")
+
+        with st.spinner("Generating comparison insights…"):
+            explanation = explain_model(
+                f"Compare these two fraud summaries:\n"
+                f"A: {article1['summary']}\n"
+                f"B: {article2['summary']}\n"
+                f"Explain what a similarity score of {sim:.4f} means.",
+                max_length=200
+            )[0]["generated_text"]
+
+        st.success(explanation)
+
+# =====================================================================
+#  TAB 4 — ABOUT
+# =====================================================================
+with tab4:
+    st.image("https://i.imgur.com/kIzoyP2.png", width=150)
+    st.markdown("<h1 style='text-align:center;'>About IntelliFraud</h1>", unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class='card'>
+        <h3>What is IntelliFraud?</h3>
+        <p>
+        IntelliFraud is an AI-powered fraud intelligence engine that uses semantic search,
+        natural language understanding, and Supabase cloud storage to analyze FINRA fraud-related articles.
+        </p>
+
+        <h3>Project Team</h3>
+        <p>
+        Created by <b>Clara Belluci</b>, <b>Troy Benner</b>, <b>Hoang Bui</b>, and <b>Tori-Ana McNeil</b>
+        for the UNC Charlotte School of Data Science in partnership with USAA.
+        </p>
     </div>
-    """
-
-    st.markdown(top_article_html, unsafe_allow_html=True)
-
-    # ------------------------------------------------------
-    # DISPLAY TOP RELATED ARTICLES
-    # ------------------------------------------------------
-    st.markdown("## 📰 Related Articles")
-
-    top_k = 5
-    related_df = df.sort_values("similarity", ascending=False).iloc[1 : top_k + 1]
-
-    if related_df.empty:
-        st.info("No related articles found.")
-    else:
-        for _, row in related_df.iterrows():
-
-            if pd.notnull(row["timestamp"]):
-                pub_date = row["timestamp"].strftime("%B %d, %Y")
-            else:
-                pub_date = "Unknown"
-
-            html_block = f"""
-            <div style="padding:15px; background:#111; border-radius:12px; margin-bottom:15px;">
-                <h3 style="color:#04d9ff;">{row['title']}</h3>
-                <p style="color:#ccc;">{row['summary']}</p>
-                <p><b style="color:#04d9ff;">Published:</b> {pub_date}</p>
-                <p><b style="color:#04d9ff;">Keywords:</b> {row['keywords']}</p>
-                <p><b style="color:#04d9ff;">Similarity:</b> {row['similarity']:.4f}</p>
-                <a href="{row['url']}" target="_blank"
-                   style="color:#00eaff; font-size:16px; font-weight:bold; text-decoration:none;">
-                   🔗 Read Full Article
-                </a>
-            </div>
-            """
-
-            st.markdown(html_block, unsafe_allow_html=True)
-
-    # ------------------------------------------------------
-    # EXPORT RESULTS
-    # ------------------------------------------------------
-    st.markdown("---")
-    st.markdown("### 📤 Export Search Results")
-
-    export_df = df[["title", "url", "summary", "keywords", "timestamp", "similarity"]]
-    csv_bytes = export_df.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        label="⬇️ Download Results as CSV",
-        data=csv_bytes,
-        file_name="fraud_intelli_search_results.csv",
-        mime="text/csv",
-    )
-
-# ------------------------------------------------------
-# FOOTER
-# ------------------------------------------------------
-st.markdown("""
-<br><br>
-<div style="text-align:center; color:#777; font-size:14px;">
-Fraud Intelli © 2025 — Built with ❤️ by UNC Charlotte SDS Team  
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
