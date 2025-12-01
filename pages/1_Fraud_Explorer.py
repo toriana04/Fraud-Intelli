@@ -1,127 +1,145 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import io
+import os
+from dotenv import load_dotenv
+from supabase import create_client
 
-# ------------------------------------------------------
-# PAGE CONFIGURATION
-# ------------------------------------------------------
-st.set_page_config(
-    page_title="Fraud Explorer",
-    page_icon="🕵️‍♀️",
-    layout="wide",
-)
+# Load environment variables
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = "DTSC_project"
+SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
 
-# ------------------------------------------------------
-# LOAD DATA
-# ------------------------------------------------------
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
+    sb = get_supabase()
+    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
+    df = pd.read_csv(io.BytesIO(file_bytes))
 
-    # Convert keywords string -> list
-    df["keyword_list"] = df["keywords"].fillna("").str.split(",")
-    df["keyword_list"] = df["keyword_list"].apply(
-        lambda lst: [k.strip() for k in lst if k.strip()]
-    )
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["summary"] = df["summary"].astype(str)
+    df["keywords"] = df["keywords"].astype(str)
 
+    return df
+# =====================================================================
+#                   1 — INTELLIFRAUD FRAUD EXPLORER
+# =====================================================================
+
+import streamlit as st
+import pandas as pd
+import io
+import os
+from dotenv import load_dotenv
+from supabase import create_client
+
+# Load environment variables
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = "DTSC_project"
+SUPABASE_CSV_PATH = "csv/fraud_articles.csv"
+
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+@st.cache_data
+def load_data():
+    sb = get_supabase()
+    file_bytes = sb.storage.from_(SUPABASE_BUCKET).download(SUPABASE_CSV_PATH)
+    df = pd.read_csv(io.BytesIO(file_bytes))
+
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["summary"] = df["summary"].astype(str)
+    df["keywords"] = df["keywords"].astype(str)
     return df
 
 df = load_data()
 
-# ------------------------------------------------------
-# PAGE TITLE
-# ------------------------------------------------------
-st.markdown("""
-<h1 style="text-align:center; color:#04d9ff; font-size:52px; font-weight:800;">
-🕵️‍♀️ Fraud Explorer Dashboard
-</h1>
-""", unsafe_allow_html=True)
+# Fraud categories
+FRAUD_TAGS = {
+    "AI Fraud": ["ai", "deepfake", "artificial intelligence"],
+    "Check Fraud": ["check fraud", "check washing"],
+    "Elder Fraud": ["older adult", "senior"],
+    "Account Takeover": ["account takeover", "hacked"],
+    "Investment Scam": ["crypto", "investment scam", "pump and dump"],
+    "Disaster Fraud": ["disaster", "relief scam"],
+    "General Fraud": ["fraud", "scam"]
+}
 
-st.markdown("""
-<div style="text-align:center; color:#cccccc; font-size:18px;">
-Explore fraud-related FINRA articles by keyword, summaries, and time trends.  
-Use the filters on the left to drill deeper into specific fraud topics.
-</div>
-""", unsafe_allow_html=True)
+def classify(text):
+    t = str(text).lower()
+    for tag, words in FRAUD_TAGS.items():
+        if any(w in t for w in words):
+            return tag
+    return "General Fraud"
 
-st.write(" ")
+df["tag"] = df["summary"].apply(classify)
 
-# ------------------------------------------------------
-# SIDEBAR FILTERS
-# ------------------------------------------------------
-st.sidebar.markdown("## 🔎 Filters")
+# =====================================================================
+#                            PAGE UI
+# =====================================================================
+st.image("https://i.imgur.com/kIzoyP2.png", width=130)
+st.title("🔍 IntelliFraud Explorer")
 
-# Build keyword filter list
-all_keywords = sorted({kw for lst in df["keyword_list"] for kw in lst})
+st.write("Browse all FINRA fraud-related articles, filter by category, date, and keywords.")
 
-selected_keywords = st.sidebar.multiselect(
-    "Filter by Keyword:",
-    all_keywords,
-    default=[]
-)
+# Filters
+col1, col2 = st.columns(2)
 
-# Filter logic
-if selected_keywords:
-    filtered_df = df[df["keyword_list"].apply(
-        lambda lst: any(kw in lst for kw in selected_keywords)
-    )]
-else:
-    filtered_df = df.copy()
+with col1:
+    fraud_filter = st.selectbox(
+        "Filter by Fraud Category",
+        ["All"] + list(FRAUD_TAGS.keys())
+    )
 
-st.sidebar.markdown("---")
-st.sidebar.write(f"### Showing **{len(filtered_df)}** articles")
+with col2:
+    date_range = st.date_input(
+        "Filter by Date Range",
+        value=(df["date"].min(), df["date"].max())
+    )
 
-# ------------------------------------------------------
-# CHARTS SECTION
-# ------------------------------------------------------
-st.markdown("## 📊 Keyword Frequency Overview")
+keyword_search = st.text_input("Keyword Search (optional):")
 
-# Calculate keyword frequencies
-keyword_freq = {}
-for lst in df["keyword_list"]:
-    for kw in lst:
-        keyword_freq[kw] = keyword_freq.get(kw, 0) + 1
+# Apply filters
+filtered = df.copy()
 
-freq_df = pd.DataFrame({
-    "keyword": list(keyword_freq.keys()),
-    "count": list(keyword_freq.values())
-}).sort_values("count", ascending=False)
+if fraud_filter != "All":
+    filtered = filtered[filtered["tag"] == fraud_filter]
 
-fig = px.bar(
-    freq_df.head(20),
-    x="keyword",
-    y="count",
-    title="Top 20 Most Frequent Fraud Keywords",
-    color="count",
-    color_continuous_scale="Teal",
-)
+start, end = date_range
+filtered = filtered[(filtered["date"] >= pd.to_datetime(start)) &
+                    (filtered["date"] <= pd.to_datetime(end))]
 
-fig.update_layout(
-    plot_bgcolor="rgba(0,0,0,0)",
-    paper_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#FFFFFF"),
-)
+if keyword_search:
+    k = keyword_search.lower()
+    filtered = filtered[filtered["summary"].str.lower().str.contains(k) |
+                        filtered["keywords"].str.lower().str.contains(k)]
 
-st.plotly_chart(fig, use_container_width=True)
+# =====================================================================
+#                        DISPLAY RESULTS
+# =====================================================================
+st.subheader(f"Found {len(filtered)} Articles")
 
-# ------------------------------------------------------
-# ARTICLE TABLE SECTION
-# ------------------------------------------------------
-st.markdown("## 📰 Filtered Articles")
+for _, row in filtered.iterrows():
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-if filtered_df.empty:
-    st.warning("No articles match the selected keywords.")
-else:
-    for idx, row in filtered_df.iterrows():
-        st.markdown(f"""
-        <div style="background-color:#111; padding:18px; border-radius:12px; margin-bottom:20px;">
-            <h3 style="color:#04d9ff;">{row['title']}</h3>
-            <p style="color:#ccc;">{row['summary']}</p>
-            <p><b style="color:#04d9ff;">Keywords:</b> 
-                <span style="color:#aaa;">{row['keywords']}</span></p>
-            <a href="{row['url']}" target="_blank" 
-               style="color:#00eaff; font-size:16px; font-weight:bold; text-decoration:none;">
-                🔗 Read Full Article
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"### **{row['title']}**")
+    st.write(f"📅 **Published:** {row['date'].date()}")
+    st.write(f"🏷 **Category:** `{row['tag']}`")
+    st.write(f"🔗 [Read Article]({row['url']})")
+
+    with st.expander("Summary"):
+        st.write(row["summary"])
+
+    st.markdown("**Keywords:**")
+    for kw in row["keywords"].split(","):
+        st.markdown(f"<span class='keyword-chip'>{kw.strip()}</span>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
