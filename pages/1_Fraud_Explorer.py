@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
-from intellifraud_ui import inject_light_ui
+from intellifraud_ui import inject_light_ui, sidebar_logo
+
+# NEW — load live data from Supabase instead of local CSV
 from load_data_supabase import load_fraud_data
+
 
 # ------------------------------------------------------------
 # PAGE CONFIG
@@ -9,30 +12,31 @@ from load_data_supabase import load_fraud_data
 st.set_page_config(page_title="Fraud Explorer", layout="wide")
 inject_light_ui()
 
-# ------------------------------------------------------------
-# TOP LOGO
-# ------------------------------------------------------------
-st.markdown("""
-<div style="text-align:center; margin-bottom:25px;">
-    <img src="https://i.imgur.com/lAVJ7Vx.png" width="240" style="border-radius:15px;">
-</div>
-""", unsafe_allow_html=True)
+# Move logo to TOP instead of sidebar
+st.markdown(
+    """
+    <div style="text-align:center; margin-top:10px;">
+        <img src="https://i.imgur.com/lAVJ7Vx.png" width="200">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # ------------------------------------------------------------
-# MATCH HOME PAGE SEARCH BAR STYLING FOR DROPDOWN + BLACK TEXT
+# CUSTOM CSS — Dropdown styling
 # ------------------------------------------------------------
 st.markdown("""
 <style>
-
-/* Wrapper styling (same as search bar) */
+/* Selectbox wrapper */
 .stSelectbox > div > div {
     background-color: #F3F4F6 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
-    padding: 8px !important;
+    padding: 6px !important;
 }
 
-/* Selected option text */
+/* Selected text */
 .stSelectbox div[data-baseweb="select"] div[class*="singleValue"] {
     color: #0A1A2F !important;
     font-size: 15px !important;
@@ -42,7 +46,7 @@ st.markdown("""
 /* Placeholder text */
 .stSelectbox div[data-baseweb="select"] div[class*="placeholder"] {
     color: #0A1A2F !important;
-    opacity: 0.75 !important;
+    opacity: 0.7 !important;
     font-size: 15px !important;
 }
 
@@ -52,23 +56,16 @@ st.markdown("""
     font-size: 15px !important;
 }
 
-/* Hover highlight */
+/* Hover option */
 .stSelectbox div[data-baseweb="popover"] div[role="option"]:hover {
     background-color: #E6EAF0 !important;
-    color: #0A65FF !important;
 }
-
-/* Focused item */
-.stSelectbox div[data-baseweb="popover"] div[role="option"][aria-selected="true"] {
-    background-color: #E6EAF0 !important;
-    color: #0A65FF !important;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
+
 # ------------------------------------------------------------
-# LOAD DATA FROM SUPABASE
+# LOAD DATA (Supabase)
 # ------------------------------------------------------------
 @st.cache_data
 def load_data():
@@ -77,8 +74,9 @@ def load_data():
 
 df = load_data()
 
+
 # ------------------------------------------------------------
-# CATEGORY DEFINITIONS
+# FRAUD CATEGORIES
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
@@ -90,8 +88,8 @@ FRAUD_CATEGORIES = {
         "fraud specialists", "fraud trends"
     ],
     "Cyber & AI Fraud": [
-        "genai fraud", "accounts genai", "computer fraudsters", "ai trading",
-        "ai investment", "artificial fraud"
+        "genai fraud", "accounts genai", "computer fraudsters",
+        "ai trading", "ai investment", "artificial fraud"
     ],
     "Mail & Check Fraud": [
         "check fraud", "stolen checks", "mail theft", "mail check", "mail fraud"
@@ -107,14 +105,15 @@ FRAUD_CATEGORIES = {
     ],
 }
 
-# lowercase keywords
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
+
 # ------------------------------------------------------------
-# MATCHING LOGIC
+# MATCHING FUNCTIONS
 # ------------------------------------------------------------
 def match_score(article_keywords, category_keywords):
+    """Return count of matching keywords."""
     score = 0
     for a_kw in article_keywords:
         for c_kw in category_keywords:
@@ -122,7 +121,9 @@ def match_score(article_keywords, category_keywords):
                 score += 1
     return score
 
+
 def get_articles(category_name):
+    """Return all matching articles sorted by relevance."""
     cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
@@ -136,28 +137,28 @@ def get_articles(category_name):
     results.sort(key=lambda x: x[0], reverse=True)
     return [row for score, row in results]
 
+
 # ------------------------------------------------------------
-# PAGE HEADER
+# HEADER
 # ------------------------------------------------------------
 st.markdown("""
 <div style="
-    padding: 25px; 
-    background: #F5F7FA; 
-    border-radius: 15px; 
-    border: 1px solid #E6E9EF; 
+    padding: 25px;
+    background: #F5F7FA;
+    border-radius: 15px;
+    border: 1px solid #E6E9EF;
     margin-bottom: 20px;
 ">
-    <h1 style="text-align:center; color:#0A1A2F; margin-bottom:5px;">
-        🗂️ Fraud Explorer
-    </h1>
+    <h1 style="text-align:center; color:#0A1A2F;">🗂️ Fraud Explorer</h1>
     <p style="text-align:center; font-size:17px; color:#0A1A2F;">
         Explore regulatory enforcement articles organized by real-world fraud categories.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
+
 # ------------------------------------------------------------
-# CATEGORY PICKER (NOW STYLED)
+# CATEGORY PICKER
 # ------------------------------------------------------------
 st.subheader("🧭 Select a Fraud Category")
 
@@ -171,8 +172,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 # ------------------------------------------------------------
-# MATCHING ARTICLES DISPLAY
+# DISPLAY MATCHING ARTICLES
 # ------------------------------------------------------------
 articles = get_articles(selected_category)
 
@@ -187,13 +189,18 @@ else:
 
         st.markdown(f"""
         <div style="
-            background-color:#FFFFFF; 
-            padding:18px; 
-            margin-bottom:15px; 
-            border-radius:12px; 
+            background-color:#FFFFFF;
+            padding:18px;
+            margin-bottom:15px;
+            border-radius:12px;
             border:1px solid #E6E9EF;
             box-shadow:0 1px 3px rgba(0,0,0,0.05);
         ">
             <h3 style="color:#0A1A2F; margin-bottom:6px;">{title}</h3>
             <p style="color:#0A1A2F;">{summary}</p>
             <p><strong>Keywords:</strong> {keywords}</p>
+            <a href="{url}" target="_blank" style="color:#0A65FF; font-weight:600;">
+                Read Full Article →
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
