@@ -23,16 +23,16 @@ st.markdown("""
 /* FIX SEARCH BAR (2025 Streamlit selectors) */
 /* --------------------------------------- */
 
-/* Input container background */
+/* Input container */
 .stTextInput > div > div {
     background-color: #F3F4F6 !important;  /* Light gray */
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
 }
 
-/* Placeholder text color */
+/* Placeholder text */
 .stTextInput input::placeholder {
-    color: #000000 !important;   /* Black */
+    color: #000000 !important;   /* Black placeholder */
     opacity: 1 !important;
 }
 
@@ -53,7 +53,6 @@ div.stDownloadButton > button {
     padding: 10px 22px !important;
     border-radius: 10px !important;
     font-size: 15px !important;
-    transition: all 0.2s ease-in-out;
 }
 
 div.stButton > button:hover,
@@ -112,7 +111,7 @@ query = st.text_input(
 # SEARCH FUNCTION
 # ---------------------------------------------------------
 def search_articles(query):
-    if not query:
+    if query is None or query.strip() == "":
         return None, None
 
     query_embedding = model.encode([query])
@@ -123,7 +122,7 @@ def search_articles(query):
 
     top_row = df.sort_values("similarity", ascending=False).iloc[0]
 
-    # Save top result to history
+    # Save top result to search history
     st.session_state["search_history"].append({
         "query": query,
         "top_title": top_row["title"],
@@ -137,7 +136,7 @@ def search_articles(query):
 # ---------------------------------------------------------
 # SHOW SEARCH RESULTS
 # ---------------------------------------------------------
-if query:
+if query is not None and query.strip() != "":
     top_result, top5 = search_articles(query)
 
     if top_result is not None:
