@@ -1,9 +1,14 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from intellifraud_ui import inject_light_ui, sidebar_logo
+import seaborn as sns
+import matplotlib.pyplot as plt
+import itertools
+import networkx as nx
+from pyvis.network import Network
+import streamlit.components.v1 as components
 
-# NEW — load data from Supabase instead of a local CSV
+from intellifraud_ui import inject_light_ui, sidebar_logo
 from load_data_supabase import load_fraud_data
 
 # ---------------------------------------------
@@ -14,7 +19,7 @@ inject_light_ui()
 sidebar_logo()
 
 # ---------------------------------------------
-# HEADER HERO
+# HEADER
 # ---------------------------------------------
 st.markdown("""
 <div style="
@@ -41,36 +46,36 @@ st.markdown("""
 def load_data():
     df = load_fraud_data()
 
-    # Ensure timestamp column parses correctly
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    # Ensure keyword lists are parsed
-    df["keywords"] = df["keywords"].apply(lambda x: x if isinstance(x, list) else [])
+    def ensure_list(x):
+        if isinstance(x, list):
+            return x
+        try:
+            return eval(x)
+        except:
+            return []
+    df["keywords"] = df["keywords"].apply(ensure_list)
 
     return df
 
 df = load_data()
 
 # ---------------------------------------------
-# EXTRACT & COUNT KEYWORDS
+# KEYWORD PROCESSING
 # ---------------------------------------------
 all_keywords = [kw for lst in df["keywords"] for kw in lst]
-
-keyword_freq = (
-    pd.Series(all_keywords)
-    .value_counts()
-    .reset_index()
-)
-
+keyword_freq = pd.Series(all_keywords).value_counts().reset_index()
 keyword_freq.columns = ["keyword", "count"]
 
-# ---------------------------------------------
-# SECTION 0 — TOP KEYWORDS (Light Mode Cards)
-# ---------------------------------------------
+
+# =====================================================
+# SECTION 0 — TOP FRAUD KEYWORDS (MOVED TO TOP)
+# =====================================================
 st.subheader("🏆 Top Fraud Keywords")
 st.markdown("""
 <p style='font-size:16px; margin-top:-10px; color:#0A1A2F;'>
-A snapshot of the most common fraud-related keywords appearing across enforcement articles.
+A snapshot of the most common fraud-related keywords.
 </p>
 """, unsafe_allow_html=True)
 
@@ -91,38 +96,35 @@ for _, row in keyword_freq.head(10).iterrows():
     </div>
     """, unsafe_allow_html=True)
 
-# ---------------------------------------------
-# SECTION 1 — Articles Published Over Time
-# ---------------------------------------------
-st.subheader("📅 Articles Published Over Time")
-st.markdown("""
-<p style='color:#0A1A2F;'>A month-by-month view of regulatory enforcement activity.</p>
-""", unsafe_allow_html=True)
 
-monthly = (
-    df.groupby(df["timestamp"].dt.to_period("M"))
-      .size()
-      .reset_index(name="count")
-)
+# =====================================================
+# SECTION 1 — HEATMAP (DAY vs HOUR)
+# =====================================================
+st.subheader("🔥 Fraud Mentions Heatmap (Day vs Hour)")
+st.markdown("<p style='color:#0A1A2F;'>When do enforcement actions peak?</p>", unsafe_allow_html=True)
 
-monthly["timestamp"] = monthly["timestamp"].astype(str)
+df["day_of_week"] = df["timestamp"].dt.day_name()
+df["hour"] = df["timestamp"].dt.hour
 
-line_chart = (
-    alt.Chart(monthly)
-    .mark_line(point=True, color="#0A65FF")
-    .encode(
-        x=alt.X("timestamp:N", title="Month"),
-        y=alt.Y("count:Q", title="Number of Articles"),
-        tooltip=["timestamp", "count"]
-    )
-    .properties(width="container", height=350)
-)
+heatmap_data = df.pivot_table(
+    index="day_of_week",
+    columns="hour",
+    values="title",
+    aggfunc="count"
+).fillna(0)
 
-st.altair_chart(line_chart, use_container_width=True)
+ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+heatmap_data = heatmap_data.reindex(ordered_days)
 
-# ---------------------------------------------
-# SECTION 2 — Keyword Frequency Bar Chart
-# ---------------------------------------------
+fig, ax = plt.subplots(figsize=(14, 6))
+sns.heatmap(heatmap_data, cmap="Blues", linewidths=.5, ax=ax)
+ax.set_title("Fraud Mentions by Day & Hour")
+st.pyplot(fig)
+
+
+# =====================================================
+# SECTION 2 — KEYWORD BAR CHART
+# =====================================================
 st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
 
 bar_chart = (
@@ -138,9 +140,70 @@ bar_chart = (
 
 st.altair_chart(bar_chart, use_container_width=True)
 
-# ---------------------------------------------
-# SECTION 3 — Full Keyword List (Light Mode Cards)
-# ---------------------------------------------
+
+# =====================================================
+# SECTION 3 — INTERACTIVE NETWORK GRAPH (PyVis)
+# =====================================================
+st.subheader("🕸️ Interactive Keyword Network")
+st.markdown("""
+<p style='color:#0A1A2F;'>
+Drag nodes • Hover to see connections • Zoom to explore the fraud landscape.
+</p>
+""", unsafe_allow_html=True)
+
+# Build co-occurrence pairs
+pairs = []
+for kw_list in df["keywords"]:
+    if len(kw_list) > 1:
+        pairs.extend(itertools.combinations(kw_list, 2))
+
+pair_counts = {}
+for a, b in pairs:
+    pair = tuple(sorted([a, b]))
+    pair_counts[pair] = pair_counts.get(pair, 0) + 1
+
+MIN_EDGE_WEIGHT = 3
+filtered_pairs = {p: w for p, w in pair_counts.items() if w >= MIN_EDGE_WEIGHT}
+
+net = Network(height="700px", width="100%", bgcolor="#FFFFFF", font_color="#0A1A2F")
+net.barnes_hut(gravity=-20000, central_gravity=0.3, spring_length=150, spring_strength=0.02)
+
+for (a, b), weight in filtered_pairs.items():
+    net.add_node(a, label=a, color="#78C2FF")
+    net.add_node(b, label=b, color="#78C2FF")
+    net.add_edge(a, b, value=weight, title=f"Co-occurrence: {weight}")
+
+net.set_options("""
+const options = {
+  nodes: {
+    shape: "dot",
+    scaling: { min: 8, max: 40 },
+    font: { size: 16, color: "#0A1A2F" }
+  },
+  edges: {
+    color: "#888",
+    smooth: true
+  },
+  physics: {
+    enabled: true,
+    barnesHut: {
+      gravitationalConstant: -20000,
+      springLength: 150,
+      springConstant: 0.02
+    }
+  }
+}
+""")
+
+net.save_graph("interactive_keywords.html")
+HtmlFile = open("interactive_keywords.html", "r", encoding="utf-8")
+source_code = HtmlFile.read()
+components.html(source_code, height=750, scrolling=True)
+
+
+# =====================================================
+# SECTION 4 — FULL KEYWORD LIST
+# =====================================================
 st.subheader("📖 Full Fraud Keyword List")
 
 for _, row in keyword_freq.iterrows():
