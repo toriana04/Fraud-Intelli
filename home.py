@@ -11,7 +11,7 @@ st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 inject_light_ui()
 
 # -------------------------------------------------
-# CSS FIXES (search bar, buttons, cards)
+# CSS FIXES (search bar, buttons, card layout)
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -20,6 +20,7 @@ st.markdown("""
     background-color: #F3F4F6 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
+    padding: 6px;
 }
 
 .stTextInput input::placeholder {
@@ -31,7 +32,7 @@ st.markdown("""
     font-size: 15px !important;
 }
 
-/* Fix black buttons */
+/* Prevent black Streamlit buttons */
 div.stButton > button,
 div.stDownloadButton > button {
     background-color: #F4F5F7 !important;
@@ -49,6 +50,7 @@ div.stDownloadButton > button:hover {
     color: #0A65FF !important;
 }
 
+/* Card styling */
 .card {
     padding: 20px;
     background: white;
@@ -64,19 +66,19 @@ div.stDownloadButton > button:hover {
 # TOP LOGO
 # -------------------------------------------------
 st.markdown("""
-<div style="text-align:center; margin-bottom: 25px;">
+<div style="text-align:center; margin-bottom:25px;">
     <img src="https://i.imgur.com/lAVJ7Vx.png" width="240" style="border-radius:15px;">
 </div>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# SEARCH HISTORY
+# SEARCH HISTORY (session state)
 # -------------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
 # -------------------------------------------------
-# HEADER
+# HEADER SECTION
 # -------------------------------------------------
 st.markdown("""
 <div class="card" style="padding:25px; margin-bottom:20px;">
@@ -89,30 +91,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# LOAD DATA FROM SUPABASE (correct source)
+# LOAD DATA FROM SUPABASE
 # -------------------------------------------------
 @st.cache_data
 def load_articles():
     df = load_fraud_data()
 
-    # Standardize columns
     df.columns = [c.lower() for c in df.columns]
 
     for col in ["title", "summary", "keywords", "url"]:
         if col not in df.columns:
             df[col] = ""
 
-    # Ensure clean keywords text
-    def clean_kw(x):
+    # convert keywords list → string
+    def format_keywords(x):
         if isinstance(x, list):
             return ", ".join(x)
         return str(x)
 
-    df["keywords"] = df["keywords"].apply(clean_kw)
-    df["summary"] = df["summary"].fillna("")
-    df["title"] = df["title"].fillna("Untitled Article")
+    df["keywords"] = df["keywords"].apply(format_keywords)
 
-    # Build text for TF-IDF
+    df["title"] = df["title"].fillna("Untitled Article")
+    df["summary"] = df["summary"].fillna("")
+
     df["search_text"] = (
         df["title"] + " " + df["summary"] + " " + df["keywords"]
     ).str.lower()
@@ -133,7 +134,7 @@ def build_tfidf(df):
 vectorizer, tfidf_matrix = build_tfidf(df)
 
 # -------------------------------------------------
-# SAFE ARTICLE MATCH FUNCTION
+# ARTICLE MATCHING
 # -------------------------------------------------
 def best_article_match(query):
     if df.empty:
@@ -141,9 +142,6 @@ def best_article_match(query):
 
     query_vec = vectorizer.transform([query.lower()])
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
-
-    if len(scores) == 0:
-        return None, 0.0, scores
 
     idx = scores.argmax()
     if idx >= len(df):
@@ -162,14 +160,16 @@ query = st.text_input(
 )
 
 # -------------------------------------------------
-# PROCESS SEARCH
+# SEARCH PROCESSING
 # -------------------------------------------------
 if query:
     article, score, score_list = best_article_match(query)
 
     if article is None:
-        st.error("⚠️ No matching results found. Try different keywords.")
+        st.error("⚠️ No matching results found.")
     else:
+
+        # Save to session search history
         st.session_state["search_history"].append({
             "query": query,
             "article_title": article["title"],
@@ -179,7 +179,7 @@ if query:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # MAIN ARTICLE CARD
+        # MAIN MATCH CARD
         st.markdown(f"""
         <div class="card">
             <h3>{article['title']}</h3>
@@ -192,8 +192,9 @@ if query:
 
         # RELATED ARTICLES
         st.subheader("📌 Related Articles")
+
         base_kw = set(article["keywords"].lower().replace(",", "").split())
-        ranked = score_list.argsort()[::-1][1:20]
+        ranked = score_list.argsort()[::-1][1:25]
 
         shown = 0
         for idx in ranked:
@@ -215,8 +216,9 @@ if query:
                 </div>
                 """, unsafe_allow_html=True)
 
+
 # -------------------------------------------------
-# SEARCH HISTORY + DOWNLOAD CSV
+# SEARCH HISTORY
 # -------------------------------------------------
 st.subheader("📝 Your Search History")
 
@@ -228,30 +230,32 @@ if st.session_state["search_history"]:
     hist_df = pd.DataFrame(st.session_state["search_history"])
     st.dataframe(hist_df, use_container_width=True)
 
-    # ⭐ DOWNLOAD BUTTON (NEW)
+    # CSV DOWNLOAD BUTTON
     csv_data = hist_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="⬇️ Download Search History CSV",
         data=csv_data,
         file_name="intellifraud_search_history.csv",
-        mime="text/csv",
+        mime="text/csv"
     )
 else:
     st.info("No searches yet.")
 
 # -------------------------------------------------
-# FIXED SIMILARITY EXPLANATION (HTML rendered)
+# SIMILARITY SCORE EXPLANATION (HTML FIXED)
 # -------------------------------------------------
 st.markdown("""
 <div class="card">
     <h3 style="margin-top:0;">📈 Understanding Similarity Scores</h3>
     <p>Similarity scores measure how closely your query aligns with article text using TF-IDF + cosine similarity.</p>
 
-    <ul style="color:#0A1A2F; font-size:15px;">
-        <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
-        <li><strong>0.60 – 0.79:</strong> Strong match</li>
-        <li><strong>0.40 – 0.59:</strong> Moderate match</li>
-        <li><strong>0.00 – 0.39:</strong> Weak match</li>
-    </ul>
+    <div style="color:#0A1A2F; font-size:15px;">
+        <ul>
+            <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
+            <li><strong>0.60 – 0.79:</strong> Strong match</li>
+            <li><strong>0.40 – 0.59:</strong> Moderate match</li>
+            <li><strong>0.00 – 0.39:</strong> Weak match</li>
+        </ul>
+    </div>
 </div>
 """, unsafe_allow_html=True)
