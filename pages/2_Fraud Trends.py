@@ -3,6 +3,9 @@ import pandas as pd
 import altair as alt
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
+# NEW — load data from Supabase instead of a local CSV
+from load_data_supabase import load_fraud_data
+
 # ---------------------------------------------
 # PAGE CONFIG & UI
 # ---------------------------------------------
@@ -32,17 +35,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# LOAD DATA
+# LOAD DATA FROM SUPABASE
 # ---------------------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
+    df = load_fraud_data()
 
+    # Ensure timestamp column parses correctly
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    df["keywords"] = df["keywords"].fillna("").apply(
-        lambda x: [k.strip().lower() for k in x.split(",") if k.strip()]
-    )
+    # Ensure keyword lists are parsed
+    df["keywords"] = df["keywords"].apply(lambda x: x if isinstance(x, list) else [])
 
     return df
 
@@ -88,7 +91,6 @@ for _, row in keyword_freq.head(10).iterrows():
     </div>
     """, unsafe_allow_html=True)
 
-
 # ---------------------------------------------
 # SECTION 1 — Articles Published Over Time
 # ---------------------------------------------
@@ -118,7 +120,6 @@ line_chart = (
 
 st.altair_chart(line_chart, use_container_width=True)
 
-
 # ---------------------------------------------
 # SECTION 2 — Keyword Frequency Bar Chart
 # ---------------------------------------------
@@ -136,7 +137,6 @@ bar_chart = (
 )
 
 st.altair_chart(bar_chart, use_container_width=True)
-
 
 # ---------------------------------------------
 # SECTION 3 — Full Keyword List (Light Mode Cards)
