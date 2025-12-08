@@ -2,15 +2,16 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from intellifraud_ui import inject_light_ui  # sidebar_logo removed
 from datetime import datetime
 
-st.set_page_config(page_title="IntelliFraud Home", layout="wide")
+from intellifraud_ui import inject_light_ui
+from load_data_supabase import load_fraud_data   # ⭐ RESTORED SUPABASE IMPORT
 
+st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 inject_light_ui()
 
 # -------------------------------------------------
-# CUSTOM CSS FOR SEARCH BAR + LOGO FIXES
+# SEARCH BAR + CARD CSS
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -23,7 +24,6 @@ st.markdown("""
 
 .stTextInput input::placeholder {
     color: #000 !important;
-    opacity: 1 !important;
 }
 
 .stTextInput input {
@@ -43,7 +43,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# LOGO AT TOP
+# TOP LOGO
 # -------------------------------------------------
 st.markdown("""
 <div style="text-align:center; margin-bottom: 25px;">
@@ -52,13 +52,80 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# SEARCH HISTORY STATE
+# SEARCH HISTORY
 # -------------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
+
 # -------------------------------------------------
-# HEADER
+# LOAD DATA FROM SUPABASE (REAL SOURCE)
+# -------------------------------------------------
+@st.cache_data
+def load_articles():
+    df = load_fraud_data()   # ⭐ REAL DATA BACK
+
+    # Normalize column names
+    df.columns = [c.lower() for c in df.columns]
+
+    # Ensure required fields exist
+    for col in ["title", "summary", "keywords", "url"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # Handle keywords that may come as lists OR strings
+    def clean_kw(x):
+        if isinstance(x, list):
+            return ", ".join(x)
+        return str(x)
+
+    df["keywords"] = df["keywords"].apply(clean_kw)
+    df["summary"] = df["summary"].fillna("")
+    df["title"] = df["title"].fillna("Untitled Article")
+
+    # Build TF-IDF search text
+    df["search_text"] = (
+        df["title"] + " " + df["summary"] + " " + df["keywords"]
+    ).str.lower()
+
+    return df
+
+df = load_articles()
+
+# -------------------------------------------------
+# BUILD TF-IDF MODEL
+# -------------------------------------------------
+@st.cache_resource
+def build_tfidf(df):
+    vectorizer = TfidfVectorizer(stop_words="english")
+    matrix = vectorizer.fit_transform(df["search_text"])
+    return vectorizer, matrix
+
+vectorizer, tfidf_matrix = build_tfidf(df)
+
+
+# -------------------------------------------------
+# SAFE ARTICLE MATCH FUNCTION
+# -------------------------------------------------
+def best_article_match(query):
+    if df.empty:
+        return None, 0.0, []
+
+    query_vec = vectorizer.transform([query.lower()])
+    scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
+
+    if len(scores) == 0:
+        return None, 0.0, scores
+
+    idx = scores.argmax()
+    if idx >= len(df):
+        return None, 0.0, scores
+
+    return df.iloc[idx], float(scores[idx]), scores
+
+
+# -------------------------------------------------
+# HEADER SECTION
 # -------------------------------------------------
 st.markdown("""
 <div class="card" style="padding:25px; margin-bottom:20px;">
@@ -70,55 +137,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# LOAD ARTICLE DATA
-# -------------------------------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
-    df["keywords"] = df["keywords"].fillna("")
-    df["summary"] = df["summary"].fillna("")
-    df["title"] = df["title"].fillna("Untitled Article")
-
-    df["search_text"] = (
-        df["title"] + " " +
-        df["summary"] + " " +
-        df["keywords"]
-    ).str.lower()
-
-    return df
-
-df = load_data()
-
-# -------------------------------------------------
-# BUILD TF-IDF MODEL
-# -------------------------------------------------
-@st.cache_resource
-def build_tfidf():
-    vectorizer = TfidfVectorizer(stop_words="english")
-    matrix = vectorizer.fit_transform(df["search_text"])
-    return vectorizer, matrix
-
-vectorizer, tfidf_matrix = build_tfidf()
-
-# -------------------------------------------------
-# SAFE MATCH FUNCTION (Fixes your crash)
-# -------------------------------------------------
-def best_article_match(query):
-    query_vec = vectorizer.transform([query.lower()])
-    scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
-
-    # If TF-IDF returns nothing / df empty
-    if len(scores) == 0 or df.empty:
-        return None, 0.0, scores
-
-    idx = scores.argmax()
-
-    # If index is outside DataFrame range
-    if idx >= len(df):
-        return None, 0.0, scores
-
-    return df.iloc[idx], float(scores[idx]), scores
 
 # -------------------------------------------------
 # SEARCH BAR
@@ -130,26 +148,27 @@ query = st.text_input(
     placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'..."
 )
 
+
 # -------------------------------------------------
-# SEARCH EXECUTION
+# EXECUTE SEARCH
 # -------------------------------------------------
 if query:
     article, score, score_list = best_article_match(query)
 
     if article is None:
-        st.error("⚠️ No matching results were found for your search.")
+        st.error("⚠️ No matching results found. Try different keywords.")
     else:
-        # save search history
+        # Save history
         st.session_state["search_history"].append({
             "query": query,
             "article_title": article["title"],
-            "keywords": article["keywords"],
             "similarity_score": round(score, 4),
+            "keywords": article["keywords"],
             "url": article["url"],
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # Display main article
+        # Show top match
         st.markdown(f"""
         <div class="card">
             <h3>{article['title']}</h3>
@@ -160,17 +179,16 @@ if query:
         </div>
         """, unsafe_allow_html=True)
 
-        # Related Articles
+        # Related articles
         st.subheader("📌 Related Articles")
 
-        top_keywords = set(article["keywords"].lower().replace(",", "").split())
-        ranked = score_list.argsort()[::-1][1:15]
+        base_kw = set(article["keywords"].lower().replace(",", "").split())
+        ranked = score_list.argsort()[::-1][1:20]
 
         shown = 0
         for idx in ranked:
             row = df.iloc[idx]
-            row_keywords = set(row["keywords"].lower().replace(",", "").split())
-            overlap = top_keywords & row_keywords
+            overlap = base_kw & set(row["keywords"].lower().replace(",", "").split())
 
             if len(overlap) >= 2:
                 shown += 1
@@ -187,27 +205,6 @@ if query:
                 </div>
                 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# FEATURE CARDS
-# -------------------------------------------------
-st.subheader("📂 Navigate IntelliFraud")
-
-features = [
-    ("🧭 Fraud Explorer", "Browse categorized fraud insights."),
-    ("📊 Fraud Trends", "Analyze keyword and temporal patterns."),
-    ("📘 Glossary", "Understand fraud terminology."),
-    ("🔍 Article Search", "Find similar articles using AI."),
-]
-
-c1, c2, c3, c4 = st.columns(4)
-for col, item in zip([c1, c2, c3, c4], features):
-    with col:
-        st.markdown(f"""
-        <div class="card">
-            <h3>{item[0]}</h3>
-            <p>{item[1]}</p>
-        </div>
-        """, unsafe_allow_html=True)
 
 # -------------------------------------------------
 # SEARCH HISTORY
@@ -218,19 +215,19 @@ if st.button("Clear Search History"):
     st.session_state["search_history"] = []
     st.rerun()
 
-if not st.session_state["search_history"]:
-    st.info("No searches yet.")
+if st.session_state["search_history"]:
+    st.dataframe(pd.DataFrame(st.session_state["search_history"]), use_container_width=True)
 else:
-    hist_df = pd.DataFrame(st.session_state["search_history"])
-    st.dataframe(hist_df, use_container_width=True)
+    st.info("No searches yet.")
+
 
 # -------------------------------------------------
-# SIMILARITY EXPLANATION (FIXED)
+# SIMILARITY EXPLANATION (HTML FIXED)
 # -------------------------------------------------
 st.markdown("""
 <div class="card">
     <h3>📈 Understanding Similarity Scores</h3>
-    <p>Similarity scores measure how closely your query matches article summaries using TF-IDF + cosine similarity.</p>
+    <p>Similarity scores measure how closely your query aligns with article text using TF-IDF + cosine similarity.</p>
 
     <ul>
         <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
