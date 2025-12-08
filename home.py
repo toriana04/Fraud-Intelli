@@ -3,15 +3,17 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
+import streamlit.components.v1 as components
 
 from intellifraud_ui import inject_light_ui
 from load_data_supabase import load_fraud_data
+
 
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 inject_light_ui()
 
 # -------------------------------------------------
-# CSS FIXES (search bar, buttons, card layout)
+# CSS FIXES
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -32,7 +34,6 @@ st.markdown("""
     font-size: 15px !important;
 }
 
-/* Prevent black Streamlit buttons */
 div.stButton > button,
 div.stDownloadButton > button {
     background-color: #F4F5F7 !important;
@@ -50,7 +51,6 @@ div.stDownloadButton > button:hover {
     color: #0A65FF !important;
 }
 
-/* Card styling */
 .card {
     padding: 20px;
     background: white;
@@ -71,45 +71,46 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
 # -------------------------------------------------
-# SEARCH HISTORY (session state)
+# SEARCH HISTORY STATE
 # -------------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
+
 # -------------------------------------------------
-# HEADER SECTION
+# HEADER
 # -------------------------------------------------
 st.markdown("""
-<div class="card" style="padding:25px; margin-bottom:20px;">
+<div class="card">
     <h1 style="margin-bottom: 5px;">🔍 Welcome to IntelliFraud</h1>
     <p style="font-size:17px;">
-        Explore fraud trends, regulatory actions, keyword signals, and investigative insights —
+        Explore fraud trends, keyword signals, and investigative insights —
         all in one intelligent dashboard.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
+
 # -------------------------------------------------
-# LOAD DATA FROM SUPABASE
+# LOAD ARTICLES FROM SUPABASE
 # -------------------------------------------------
 @st.cache_data
 def load_articles():
     df = load_fraud_data()
-
     df.columns = [c.lower() for c in df.columns]
 
     for col in ["title", "summary", "keywords", "url"]:
         if col not in df.columns:
             df[col] = ""
 
-    # convert keywords list → string
-    def format_keywords(x):
+    def fix_kw(x):
         if isinstance(x, list):
             return ", ".join(x)
         return str(x)
 
-    df["keywords"] = df["keywords"].apply(format_keywords)
+    df["keywords"] = df["keywords"].apply(fix_kw)
 
     df["title"] = df["title"].fillna("Untitled Article")
     df["summary"] = df["summary"].fillna("")
@@ -120,10 +121,12 @@ def load_articles():
 
     return df
 
+
 df = load_articles()
 
+
 # -------------------------------------------------
-# BUILD TF-IDF MODEL
+# BUILD TF-IDF VECTOR MODEL
 # -------------------------------------------------
 @st.cache_resource
 def build_tfidf(df):
@@ -131,10 +134,12 @@ def build_tfidf(df):
     matrix = vectorizer.fit_transform(df["search_text"])
     return vectorizer, matrix
 
+
 vectorizer, tfidf_matrix = build_tfidf(df)
 
+
 # -------------------------------------------------
-# ARTICLE MATCHING
+# MATCHING FUNCTION
 # -------------------------------------------------
 def best_article_match(query):
     if df.empty:
@@ -142,12 +147,13 @@ def best_article_match(query):
 
     query_vec = vectorizer.transform([query.lower()])
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
-
     idx = scores.argmax()
+
     if idx >= len(df):
         return None, 0.0, scores
 
     return df.iloc[idx], float(scores[idx]), scores
+
 
 # -------------------------------------------------
 # SEARCH BAR
@@ -159,17 +165,16 @@ query = st.text_input(
     placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'..."
 )
 
+
 # -------------------------------------------------
-# SEARCH PROCESSING
+# PROCESS SEARCH
 # -------------------------------------------------
 if query:
     article, score, score_list = best_article_match(query)
 
     if article is None:
-        st.error("⚠️ No matching results found.")
+        st.error("⚠️ No matching results found!")
     else:
-
-        # Save to session search history
         st.session_state["search_history"].append({
             "query": query,
             "article_title": article["title"],
@@ -179,7 +184,7 @@ if query:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # MAIN MATCH CARD
+        # Main Card
         st.markdown(f"""
         <div class="card">
             <h3>{article['title']}</h3>
@@ -190,11 +195,11 @@ if query:
         </div>
         """, unsafe_allow_html=True)
 
-        # RELATED ARTICLES
+        # Related Articles
         st.subheader("📌 Related Articles")
 
         base_kw = set(article["keywords"].lower().replace(",", "").split())
-        ranked = score_list.argsort()[::-1][1:25]
+        ranked = score_list.argsort()[::-1][1:20]
 
         shown = 0
         for idx in ranked:
@@ -209,7 +214,7 @@ if query:
                 st.markdown(f"""
                 <div class="card">
                     <h4>{row['title']}</h4>
-                    <p>{row['summary'][:220]}...</p>
+                    <p>{row['summary'][:250]}...</p>
                     <p><strong>Shared Keywords:</strong> {', '.join(overlap)}</p>
                     <p><strong>Similarity Score:</strong> {score_list[idx]:.2f}</p>
                     <a href="{row['url']}" target="_blank"><strong>Read Article →</strong></a>
@@ -218,7 +223,7 @@ if query:
 
 
 # -------------------------------------------------
-# SEARCH HISTORY
+# SEARCH HISTORY + CSV DOWNLOAD
 # -------------------------------------------------
 st.subheader("📝 Your Search History")
 
@@ -230,32 +235,33 @@ if st.session_state["search_history"]:
     hist_df = pd.DataFrame(st.session_state["search_history"])
     st.dataframe(hist_df, use_container_width=True)
 
-    # CSV DOWNLOAD BUTTON
-    csv_data = hist_df.to_csv(index=False).encode("utf-8")
+    csv = hist_df.to_csv(index=False).encode("utf-8")
+
     st.download_button(
         label="⬇️ Download Search History CSV",
-        data=csv_data,
+        data=csv,
         file_name="intellifraud_search_history.csv",
         mime="text/csv"
     )
 else:
     st.info("No searches yet.")
 
+
 # -------------------------------------------------
-# SIMILARITY SCORE EXPLANATION (HTML FIXED)
+# ⭐ BULLETPROOF SIMILARITY SECTION (NO HTML TEXT EVER)
 # -------------------------------------------------
-st.markdown("""
+similarity_html = """
 <div class="card">
     <h3 style="margin-top:0;">📈 Understanding Similarity Scores</h3>
     <p>Similarity scores measure how closely your query aligns with article text using TF-IDF + cosine similarity.</p>
 
-    <div style="color:#0A1A2F; font-size:15px;">
-        <ul>
-            <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
-            <li><strong>0.60 – 0.79:</strong> Strong match</li>
-            <li><strong>0.40 – 0.59:</strong> Moderate match</li>
-            <li><strong>0.00 – 0.39:</strong> Weak match</li>
-        </ul>
-    </div>
+    <ul style="font-size:15px; color:#0A1A2F;">
+        <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
+        <li><strong>0.60 – 0.79:</strong> Strong match</li>
+        <li><strong>0.40 – 0.59:</strong> Moderate match</li>
+        <li><strong>0.00 – 0.39:</strong> Weak match</li>
+    </ul>
 </div>
-""", unsafe_allow_html=True)
+"""
+
+components.html(similarity_html, height=350)
