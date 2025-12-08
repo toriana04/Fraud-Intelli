@@ -9,3 +9,4 @@ spacy
 supabase==2.4.6
 python-dotenv
 altair
+matplotlib
