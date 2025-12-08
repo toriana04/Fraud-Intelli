@@ -18,24 +18,25 @@ inject_light_ui()
 # ---------------------------------------------------------
 st.markdown("""
 <style>
-/* Light gray modern search bar */
+
+/* LIGHTER GRAY SEARCH BAR INPUT */
 div[data-baseweb="input"] {
-    background-color: #F4F5F7 !important;
+    background-color: #F9FAFB !important;
     border-radius: 10px !important;
 }
 
-/* Placeholder text visible */
+/* BLACK PLACEHOLDER TEXT */
 input::placeholder {
-    color: #6B7280 !important;
+    color: #000000 !important;
     opacity: 1 !important;
 }
 
-/* Actual text in search input */
+/* Actual text color inside input */
 input {
     color: #0A1A2F !important;
 }
 
-/* Fix black button issue */
+/* FIX BLACK normal BUTTONS */
 div.stButton > button {
     background-color: #F4F5F7 !important;
     color: #0A1A2F !important;
@@ -45,12 +46,27 @@ div.stButton > button {
     font-size: 15px !important;
     transition: all 0.2s ease-in-out;
 }
-
 div.stButton > button:hover {
     background-color: #E6EAF0 !important;
     border-color: #0A65FF !important;
     color: #0A65FF !important;
 }
+
+/* FIX BLACK DOWNLOAD BUTTON */
+div.stDownloadButton > button {
+    background-color: #F4F5F7 !important;
+    color: #0A1A2F !important;
+    border: 1px solid #D0D7E2 !important;
+    padding: 10px 18px !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+}
+div.stDownloadButton > button:hover {
+    background-color: #E6EAF0 !important;
+    border-color: #0A65FF !important;
+    color: #0A65FF !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,6 +86,7 @@ st.markdown("""
 # ---------------------------------------------------------
 df = load_fraud_data()
 model = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 # ---------------------------------------------------------
 # SEARCH HISTORY STATE
@@ -102,7 +119,7 @@ def search_articles(query):
 
     top_row = df.sort_values("similarity", ascending=False).iloc[0]
 
-    # Save only top article in history
+    # Save only the top article to search history
     st.session_state["search_history"].append({
         "query": query,
         "top_title": top_row["title"],
@@ -114,7 +131,7 @@ def search_articles(query):
 
 
 # ---------------------------------------------------------
-# SHOW RESULTS
+# SHOW SEARCH RESULTS
 # ---------------------------------------------------------
 if query:
     top_result, top5 = search_articles(query)
@@ -139,7 +156,7 @@ if query:
 
 
 # ---------------------------------------------------------
-# NAVIGATION SECTION (CLICKABLE BUTTONS)
+# NAVIGATION SECTION
 # ---------------------------------------------------------
 st.markdown("## 🌐 Navigate IntelliFraud")
 
@@ -159,14 +176,13 @@ with col3:
 
 
 # ---------------------------------------------------------
-# SEARCH HISTORY DOWNLOAD + DELETE
+# DOWNLOAD & CLEAR SEARCH HISTORY
 # ---------------------------------------------------------
 st.markdown("---")
 st.subheader("📥 Download Your Search History")
 
 if len(st.session_state["search_history"]) > 0:
     hist_df = pd.DataFrame(st.session_state["search_history"])
-
     csv = hist_df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
@@ -179,7 +195,7 @@ else:
     st.info("No search history yet.")
 
 
-# Clear history button
+# CLEAR HISTORY BUTTON
 st.markdown("### 🧹 Manage Search History")
 
 if st.button("❌ Clear Search History"):
@@ -193,13 +209,12 @@ if st.button("❌ Clear Search History"):
 st.markdown("---")
 st.markdown("""
 ### ❓ How Similarity Scores Work
-Similarity scores measure **how closely your search query matches each article** in IntelliFraud's database using transformer-based semantic embeddings.
+Similarity scores measure how closely your search matches each article using semantic embeddings.
 
-**Score Meaning:**  
 - **0.85 – 1.00 → Extremely relevant**  
 - **0.70 – 0.85 → Strongly relevant**  
 - **0.50 – 0.70 → Moderately relevant**  
 - **Below 0.50 → Weak match**
 
-IntelliFraud uses a state-of-the-art language model (MiniLM) to compute similarity between your search and each article summary.
+IntelliFraud uses a transformer model (MiniLM) to compute similarity between your search and article summaries.
 """)
