@@ -15,6 +15,19 @@ st.set_page_config(page_title="Fraud Trends", layout="wide")
 inject_light_ui()
 
 # ---------------------------------------------
+# MOVE LOGO TO TOP OF PAGE (ONLY PLACE IT SHOWS)
+# ---------------------------------------------
+st.markdown("""
+<div style="text-align:center; margin-top:15px; margin-bottom:20px;">
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="160" style="border-radius:12px;">
+</div>
+""", unsafe_allow_html=True)
+
+# REMOVE THE SIDEBAR LOGO
+# sidebar_logo()
+
+
+# ---------------------------------------------
 # MOVE LOGO TO TOP OF PAGE
 # ---------------------------------------------
 st.markdown("""
@@ -222,3 +235,4 @@ if search_value:
     table = table[table["keyword"].str.contains(search_value, case=False)]
 
 st.dataframe(table, use_container_width=True)
+
