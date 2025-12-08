@@ -4,7 +4,6 @@ import altair as alt
 import seaborn as sns
 import matplotlib.pyplot as plt
 import itertools
-import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
 
@@ -45,7 +44,6 @@ st.markdown("""
 @st.cache_data
 def load_data():
     df = load_fraud_data()
-
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
     def ensure_list(x):
@@ -57,7 +55,6 @@ def load_data():
             return []
 
     df["keywords"] = df["keywords"].apply(ensure_list)
-
     return df
 
 df = load_data()
@@ -97,31 +94,7 @@ for _, row in keyword_freq.head(10).iterrows():
     """, unsafe_allow_html=True)
 
 # =====================================================
-# SECTION 1 — HEATMAP (DAY vs HOUR)
-# =====================================================
-st.subheader("🔥 Fraud Mentions Heatmap (Day vs Hour)")
-st.markdown("<p style='color:#0A1A2F;'>When do enforcement actions peak?</p>", unsafe_allow_html=True)
-
-df["day_of_week"] = df["timestamp"].dt.day_name()
-df["hour"] = df["timestamp"].dt.hour
-
-heatmap_data = df.pivot_table(
-    index="day_of_week",
-    columns="hour",
-    values="title",
-    aggfunc="count"
-).fillna(0)
-
-ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-heatmap_data = heatmap_data.reindex(ordered_days)
-
-fig, ax = plt.subplots(figsize=(14, 6))
-sns.heatmap(heatmap_data, cmap="Blues", linewidths=.5, ax=ax)
-ax.set_title("Fraud Mentions by Day & Hour")
-st.pyplot(fig)
-
-# =====================================================
-# SECTION 2 — KEYWORD BAR CHART
+# SECTION 1 — KEYWORD BAR CHART
 # =====================================================
 st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
 
@@ -139,9 +112,9 @@ bar_chart = (
 st.altair_chart(bar_chart, use_container_width=True)
 
 # =====================================================
-# SECTION 3 — INTERACTIVE KEYWORD NETWORK (PyVis)
+# SECTION 2 — OPTIMIZED INTERACTIVE KEYWORD NETWORK
 # =====================================================
-st.subheader("🕸️ Interactive Keyword Network")
+st.subheader("🕸️ Interactive Keyword Network (Optimized)")
 st.markdown("""
 <p style='color:#0A1A2F;'>
 Drag nodes • Hover to see connections • Zoom to explore the fraud landscape.
@@ -159,8 +132,8 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-# Filter weak edges
-MIN_EDGE_WEIGHT = 3
+# More restrictive filtering (optimized)
+MIN_EDGE_WEIGHT = 6
 filtered_pairs = {pair: count for pair, count in pair_counts.items() if count >= MIN_EDGE_WEIGHT}
 
 if not filtered_pairs:
@@ -170,32 +143,63 @@ else:
     net.barnes_hut()
 
     keyword_freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
-
     for kw, freq in keyword_freq_map.items():
-        if freq > 1:
+        if freq > 2:
             net.add_node(
                 kw,
                 label=kw,
-                size=min(freq * 2, 40),
+                size=min(freq * 2, 45),
                 color="#0A65FF"
             )
 
     for (a, b), weight in filtered_pairs.items():
         net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
 
+    # Optimized visualization settings
+    net.set_options("""
+    var options = {
+      nodes: {
+        font: { size: 22, face: "arial", color: "#0A1A2F" },
+        shape: "dot",
+        borderWidth: 1
+      },
+      edges: {
+        width: 2,
+        color: { color: "#0A65FF", highlight: "#003EAA" },
+        smooth: { enabled: true, type: "continuous" }
+      },
+      physics: {
+        enabled: true,
+        stabilization: { iterations: 200 },
+        barnesHut: {
+          gravitationalConstant: -6000,
+          centralGravity: 0.15,
+          springLength: 190,
+          springConstant: 0.025,
+          avoidOverlap: 1
+        }
+      },
+      interaction: {
+        hover: true,
+        zoomView: true,
+        dragView: true
+      }
+    }
+    """)
+
     net.save_graph("keyword_network.html")
     HtmlFile = open("keyword_network.html", "r", encoding="utf-8")
     components.html(HtmlFile.read(), height=650, scrolling=True)
 
 # =====================================================
-# SECTION 4 — FULL FRAUD KEYWORD LIST (TABLE)
+# SECTION 3 — FULL FRAUD KEYWORD LIST
 # =====================================================
 st.subheader("📚 Full Fraud Keyword List")
 st.markdown("<p style='color:#0A1A2F;'>Search, explore, and analyze all fraud-related keywords.</p>", unsafe_allow_html=True)
 
 search_term = st.text_input("Search keywords:")
-
 filtered_table = keyword_freq.copy()
+
 if search_term:
     filtered_table = filtered_table[filtered_table["keyword"].str.contains(search_term, case=False)]
 
