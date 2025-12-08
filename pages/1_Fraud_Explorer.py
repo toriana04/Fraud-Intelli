@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-from intellifraud_ui import inject_light_ui, sidebar_logo
-
-# NEW — load live data from Supabase instead of local CSV
+from intellifraud_ui import inject_light_ui
 from load_data_supabase import load_fraud_data
 
 # ------------------------------------------------------------
@@ -10,7 +8,40 @@ from load_data_supabase import load_fraud_data
 # ------------------------------------------------------------
 st.set_page_config(page_title="Fraud Explorer", layout="wide")
 inject_light_ui()
-sidebar_logo()
+
+# ------------------------------------------------------------
+# TOP LOGO (same as home page)
+# ------------------------------------------------------------
+st.markdown("""
+<div style="text-align:center; margin-bottom:25px;">
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="240" style="border-radius:15px;">
+</div>
+""", unsafe_allow_html=True)
+
+# ------------------------------------------------------------
+# MATCH HOME PAGE DROPDOWN / SEARCH BAR CSS
+# ------------------------------------------------------------
+st.markdown("""
+<style>
+
+.stSelectbox > div > div {
+    background-color: #F3F4F6 !important;
+    border-radius: 10px !important;
+    border: 1px solid #D1D5DB !important;
+    padding: 6px !important;
+}
+
+.stSelectbox select {
+    color: #0A1A2F !important;
+    font-size: 15px !important;
+}
+
+.stSelectbox div[data-baseweb="select"] > div {
+    background-color: #F3F4F6 !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ------------------------------------------------------------
 # LOAD DATA (Supabase)
@@ -23,42 +54,36 @@ def load_data():
 df = load_data()
 
 # ------------------------------------------------------------
-# FRAUD CATEGORIES (unchanged from your file)
+# FRAUD CATEGORIES
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
         "investment fraud", "investment scams", "investment scam", "investing",
         "invest ai", "ai trading", "ai investment"
     ],
-
     "Financial Fraud": [
         "financial fraud", "financial scam", "fraud recovering", "fraud awareness",
         "fraud specialists", "fraud trends"
     ],
-
     "Cyber & AI Fraud": [
         "genai fraud", "accounts genai", "computer fraudsters", "ai trading",
         "ai investment", "artificial fraud"
     ],
-
     "Mail & Check Fraud": [
         "check fraud", "stolen checks", "mail theft", "mail check", "mail fraud"
     ],
-
     "Elder Fraud": [
         "older adults", "increase fraud", "fraud exposure", "fraud risk"
     ],
-
     "Disaster & Emergency Fraud": [
         "disaster fraud", "natural disasters", "disaster contribute"
     ],
-
     "Money Laundering": [
         "money laundering", "illicit finance", "laundering fraud"
     ],
 }
 
-# lowercase lists for matching
+# lowercase keywords
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
@@ -66,7 +91,6 @@ for cat in FRAUD_CATEGORIES:
 # MATCHING FUNCTIONS
 # ------------------------------------------------------------
 def match_score(article_keywords, category_keywords):
-    """Return count of matching keywords."""
     score = 0
     for a_kw in article_keywords:
         for c_kw in category_keywords:
@@ -75,14 +99,12 @@ def match_score(article_keywords, category_keywords):
     return score
 
 def get_articles(category_name):
-    """Return all matching articles sorted by relevance."""
     cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
     for _, row in df.iterrows():
         keywords_list = row["keywords"] if isinstance(row["keywords"], list) else []
         score = match_score(keywords_list, cat_keywords)
-
         if score > 0:
             results.append((score, row))
 
@@ -110,7 +132,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# CATEGORY PICKER
+# CATEGORY PICKER (NOW MATCHES HOME SEARCH BAR)
 # ------------------------------------------------------------
 st.subheader("🧭 Select a Fraud Category")
 
@@ -138,7 +160,6 @@ else:
         url = row["url"]
         keywords = ", ".join(row["keywords"]) if isinstance(row["keywords"], list) else ""
 
-        # Card layout (unchanged from your original design)
         st.markdown(f"""
         <div style="
             background-color:#FFFFFF; 
@@ -152,7 +173,7 @@ else:
             <p style="color:#0A1A2F;">{summary}</p>
             <p><strong>Keywords:</strong> {keywords}</p>
             <a href="{url}" target="_blank" style="color:#0A65FF; font-weight:600;">
-                Read Full Article → 
+                Read Full Article →
             </a>
         </div>
         """, unsafe_allow_html=True)
