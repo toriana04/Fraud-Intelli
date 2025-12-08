@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
+# NEW — load live data from Supabase instead of local CSV
+from load_data_supabase import load_fraud_data
+
 # ------------------------------------------------------------
 # PAGE CONFIG
 # ------------------------------------------------------------
@@ -10,42 +13,17 @@ inject_light_ui()
 sidebar_logo()
 
 # ------------------------------------------------------------
-# HEADER HERO
-# ------------------------------------------------------------
-st.markdown("""
-<div style="
-    padding: 25px; 
-    background: #F5F7FA; 
-    border-radius: 15px; 
-    border: 1px solid #E6E9EF; 
-    margin-bottom: 20px;
-">
-    <h1 style="text-align:center; color:#0A1A2F; margin-bottom:5px;">
-        🗂️ Fraud Explorer
-    </h1>
-    <p style="text-align:center; font-size:17px; color:#0A1A2F;">
-        Explore regulatory enforcement articles organized by real-world fraud categories.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# ------------------------------------------------------------
-# LOAD DATA
+# LOAD DATA (Supabase)
 # ------------------------------------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
-
-    # Parse keywords
-    df["keywords"] = df["keywords"].fillna("").apply(
-        lambda x: [k.strip().lower() for k in x.split(",") if k.strip()]
-    )
+    df = load_fraud_data()
     return df
 
 df = load_data()
 
 # ------------------------------------------------------------
-# FRAUD CATEGORIES
+# FRAUD CATEGORIES (unchanged from your file)
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
@@ -80,14 +58,15 @@ FRAUD_CATEGORIES = {
     ],
 }
 
-# Lowercase categories
+# lowercase lists for matching
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
 # ------------------------------------------------------------
-# MATCHING FUNCTION
+# MATCHING FUNCTIONS
 # ------------------------------------------------------------
 def match_score(article_keywords, category_keywords):
+    """Return count of matching keywords."""
     score = 0
     for a_kw in article_keywords:
         for c_kw in category_keywords:
@@ -96,17 +75,39 @@ def match_score(article_keywords, category_keywords):
     return score
 
 def get_articles(category_name):
-    """Return sorted list of articles matching category."""
+    """Return all matching articles sorted by relevance."""
     cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
     for _, row in df.iterrows():
-        score = match_score(row["keywords"], cat_keywords)
+        keywords_list = row["keywords"] if isinstance(row["keywords"], list) else []
+        score = match_score(keywords_list, cat_keywords)
+
         if score > 0:
             results.append((score, row))
 
     results.sort(key=lambda x: x[0], reverse=True)
     return [row for score, row in results]
+
+# ------------------------------------------------------------
+# HEADER
+# ------------------------------------------------------------
+st.markdown("""
+<div style="
+    padding: 25px; 
+    background: #F5F7FA; 
+    border-radius: 15px; 
+    border: 1px solid #E6E9EF; 
+    margin-bottom: 20px;
+">
+    <h1 style="text-align:center; color:#0A1A2F; margin-bottom:5px;">
+        🗂️ Fraud Explorer
+    </h1>
+    <p style="text-align:center; font-size:17px; color:#0A1A2F;">
+        Explore regulatory enforcement articles organized by real-world fraud categories.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ------------------------------------------------------------
 # CATEGORY PICKER
@@ -135,9 +136,9 @@ else:
         title = row["title"]
         summary = row["summary"]
         url = row["url"]
-        keywords = ", ".join(row["keywords"])
+        keywords = ", ".join(row["keywords"]) if isinstance(row["keywords"], list) else ""
 
-        # Light-mode article card
+        # Card layout (unchanged from your original design)
         st.markdown(f"""
         <div style="
             background-color:#FFFFFF; 
@@ -151,7 +152,7 @@ else:
             <p style="color:#0A1A2F;">{summary}</p>
             <p><strong>Keywords:</strong> {keywords}</p>
             <a href="{url}" target="_blank" style="color:#0A65FF; font-weight:600;">
-                Read Full Article →
+                Read Full Article → 
             </a>
         </div>
         """, unsafe_allow_html=True)
