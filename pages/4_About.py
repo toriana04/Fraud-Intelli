@@ -60,7 +60,7 @@ across financial and cyber fraud.
 </p>
 
 <p style="font-size:18px; color:#0A1A2F;">
-The platform is powered by publicly available sources—including FINRA enforcement data—and uses
+The platform is powered by publicly available sources, including FINRA enforcement data, and uses
 modern data science workflows built with <strong>Python</strong>, <strong>Streamlit</strong>, and <strong>Supabase</strong>.
 IntelliFraud supports live search, pattern detection, keyword analytics, and automated insights.
 </p>
@@ -92,4 +92,5 @@ st.markdown(
 """,
     unsafe_allow_html=True
 )
+
 
