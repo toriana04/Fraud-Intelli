@@ -98,7 +98,7 @@ for _, row in keyword_freq.head(10).iterrows():
 # =====================================================
 # SECTION 1 — BAR CHART
 # =====================================================
-st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
+st.subheader("🔑 Most Common Fraud Keywords")
 
 bar_chart = (
     alt.Chart(keyword_freq.head(20))
@@ -116,7 +116,7 @@ st.altair_chart(bar_chart, use_container_width=True)
 # =====================================================
 # SECTION 2 — INTERACTIVE NETWORK GRAPH
 # =====================================================
-st.subheader("🕸️ Interactive Keyword Network (Optimized)")
+st.subheader("🕸️ Interactive Keyword Network")
 
 pairs = []
 for kw_list in df["keywords"]:
@@ -220,6 +220,7 @@ if search_value:
     table = table[table["keyword"].str.contains(search_value, case=False)]
 
 st.dataframe(table, use_container_width=True)
+
 
 
 
