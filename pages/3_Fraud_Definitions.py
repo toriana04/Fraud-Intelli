@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from intellifraud_ui import inject_light_ui, sidebar_logo
+from intellifraud_ui import inject_light_ui
 
 # NEW — load live data from Supabase
 from load_data_supabase import load_fraud_data
@@ -10,7 +10,6 @@ from load_data_supabase import load_fraud_data
 # ---------------------------------------------
 st.set_page_config(page_title="Fraud Definitions", layout="wide")
 inject_light_ui()
-sidebar_logo()
 
 # ---------------------------------------------
 # HEADER HERO
@@ -38,23 +37,65 @@ st.markdown("""
 # ---------------------------------------------
 @st.cache_data
 def load_data():
-    df = load_fraud_data()  # REAL Supabase dataset
+    df = load_fraud_data()
 
-    # Ensure parsed keywords
+    # Parse keywords if necessary
     df["keywords"] = df["keywords"].apply(
         lambda x: x if isinstance(x, list) else []
     )
-
     return df
 
 df = load_data()
 
 # gather unique keywords
-all_keywords = sorted({kw for kw_list in df["keywords"] for kw in kw_list})
+all_keywords = sorted({kw.lower().strip() for kw_list in df["keywords"] for kw in kw_list})
 
 # ---------------------------------------------
-# FRAUD TYPE DEFINITIONS (unchanged)
+# EXPANDED KEYWORD DEFINITIONS (MUCH BROADER)
 # ---------------------------------------------
+KEYWORD_DEFINITIONS = {
+    "ponzi scheme": "A fraud where returns for older investors are paid using new investor funds rather than actual profits.",
+    "ponzi": "A form of investment fraud using new investor money to pay old investors.",
+    "scam": "A deceptive operation intended to defraud a victim.",
+    "fraud": "Intentional deception for financial or personal gain.",
+    "securities fraud": "Illegal manipulation or deception in stock or commodities markets.",
+    "insider trading": "Buying or selling securities based on confidential, non-public information.",
+    "phishing": "A cyberattack where criminals impersonate trusted entities to steal data.",
+    "smishing": "Text-message-based phishing designed to steal credentials or money.",
+    "vishing": "Voice-based phishing using fraudulent phone calls.",
+    "money laundering": "The process of disguising illegally obtained money as legitimate income.",
+    "identity theft": "Using another person's personal information without permission for fraud.",
+    "market manipulation": "Artificially influencing market prices or trading volume.",
+    "investment fraud": "Deceiving investors using false information, fake opportunities, or misleading claims.",
+    "account takeover": "Unauthorized access and control of a victim's login-protected accounts.",
+    "cyber fraud": "Fraud executed through digital systems, malware, or unauthorized access.",
+    "credit card fraud": "Unauthorized use of a cardholder’s financial information.",
+    "wire fraud": "Using electronic communications (email, phone, internet) to execute a fraudulent scheme.",
+    "elder fraud": "Scams that target older adults through coercion, deception, or financial manipulation.",
+    "pump and dump": "Artificially inflating a stock price through misleading statements before selling it off.",
+}
+
+def get_definition(term):
+    """Match definitions flexibly and avoid repetitive fallback text."""
+    t = term.lower().strip()
+
+    # Direct match
+    if t in KEYWORD_DEFINITIONS:
+        return KEYWORD_DEFINITIONS[t]
+
+    # Partial match (e.g., "phishing scams" → "phishing")
+    for key in KEYWORD_DEFINITIONS:
+        if key in t:
+            return KEYWORD_DEFINITIONS[key]
+
+    # Unique fallback (no repetition)
+    return f"{term.capitalize()} is a term commonly associated with fraud, risk, or financial misconduct within regulatory and compliance contexts."
+
+# ---------------------------------------------
+# SECTION 1 — MAJOR FRAUD TYPES
+# ---------------------------------------------
+st.subheader("🧭 Major Types of Fraud")
+
 FRAUD_TYPES = {
     "Investment Fraud": "Deceptive practices that induce investors to make financial decisions based on misleading or incomplete information.",
     "Securities Fraud": "Illegal activities involving deception or manipulation in securities markets.",
@@ -63,45 +104,12 @@ FRAUD_TYPES = {
     "Money Laundering": "Disguising illicit financial proceeds to appear legitimate.",
     "Wire Fraud": "Fraud using electronic communication such as phone, internet, or email.",
     "Phishing": "Impersonation attacks to steal sensitive information.",
-    "Elder Fraud": "Financial exploitation targeting older adults, often involving coercion or deception.",
-    "Affinity Fraud": "Scams targeting members of identifiable groups such as religious or ethnic communities.",
-    "Insider Trading": "Illegal trading of securities based on confidential, non-public information.",
-    "Market Manipulation": "Interference with markets to artificially influence prices or trading volume.",
-    "Ponzi Scheme": "Paying returns to investors using new investor money rather than profits.",
-    "Pyramid Scheme": "Recruitment-based fraud where payouts depend on enrolling others.",
-    "Embezzlement": "Theft or misappropriation of funds entrusted to someone.",
-    "Cyber Fraud": "Fraud conducted via digital channels including hacking or malware.",
-    "Credit Card Fraud": "Unauthorized use of someone’s credit card information.",
-    "Mortgage Fraud": "Misrepresentation or omission of data to obtain a home loan.",
-    "Insurance Fraud": "False claims or information to obtain illegitimate insurance benefits.",
+    "Elder Fraud": "Financial exploitation targeting older adults.",
+    "Affinity Fraud": "Scams targeting members of identifiable social or community groups.",
+    "Insider Trading": "Illegal trading of securities based on confidential information.",
+    "Market Manipulation": "Artificially influencing market activity or prices.",
+    "Ponzi Scheme": "Paying earlier investors with funds from new investors rather than profit.",
 }
-
-# ---------------------------------------------
-# BUILT-IN KEYWORD DEFINITIONS
-# ---------------------------------------------
-DEFAULT_DEFINITIONS = {
-    "ponzi scheme": "A fraudulent operation where earlier investors are paid using funds from new investors.",
-    "scam": "A dishonest scheme intended to deceive or defraud.",
-    "fraud": "Intentional deception for financial or personal gain.",
-    "securities fraud": "Deception in stock or commodities markets to mislead investors.",
-    "insider trading": "Illegal trading based on confidential, non-public information.",
-    "phishing": "Cyber deception involving impersonation to steal data.",
-    "money laundering": "Disguising the origins of illegal money.",
-    "identity theft": "Unauthorized use of someone's personal data.",
-    "market manipulation": "Creating artificial market activity or prices.",
-    "investment fraud": "Deceiving investors using misleading financial information.",
-}
-
-def get_definition(term):
-    """Return known definition or fallback."""
-    if term in DEFAULT_DEFINITIONS:
-        return DEFAULT_DEFINITIONS[term]
-    return f"{term.capitalize()} refers to activity commonly associated with financial misconduct or fraud-related risk."
-
-# ---------------------------------------------
-# SECTION 1 — MAJOR FRAUD TYPES
-# ---------------------------------------------
-st.subheader("🧭 Major Types of Fraud")
 
 for fraud_type, definition in FRAUD_TYPES.items():
     st.markdown(f"""
