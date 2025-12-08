@@ -8,12 +8,14 @@ import streamlit.components.v1 as components
 from intellifraud_ui import inject_light_ui
 from load_data_supabase import load_fraud_data
 
-
+# -------------------------------------------------
+# PAGE SETUP
+# -------------------------------------------------
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 inject_light_ui()
 
 # -------------------------------------------------
-# CSS FIXES
+# GLOBAL CSS
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -34,6 +36,7 @@ st.markdown("""
     font-size: 15px !important;
 }
 
+/* Fix black buttons */
 div.stButton > button,
 div.stDownloadButton > button {
     background-color: #F4F5F7 !important;
@@ -51,6 +54,7 @@ div.stDownloadButton > button:hover {
     color: #0A65FF !important;
 }
 
+/* Card styling */
 .card {
     padding: 20px;
     background: white;
@@ -63,7 +67,7 @@ div.stDownloadButton > button:hover {
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# TOP LOGO
+# LOGO
 # -------------------------------------------------
 st.markdown("""
 <div style="text-align:center; margin-bottom:25px;">
@@ -71,16 +75,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
 # -------------------------------------------------
 # SEARCH HISTORY STATE
 # -------------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
-
 # -------------------------------------------------
-# HEADER
+# HEADER CARD
 # -------------------------------------------------
 st.markdown("""
 <div class="card">
@@ -91,7 +93,6 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
-
 
 # -------------------------------------------------
 # LOAD ARTICLES FROM SUPABASE
@@ -105,13 +106,13 @@ def load_articles():
         if col not in df.columns:
             df[col] = ""
 
+    # Convert keyword lists → clean string
     def fix_kw(x):
         if isinstance(x, list):
             return ", ".join(x)
         return str(x)
 
     df["keywords"] = df["keywords"].apply(fix_kw)
-
     df["title"] = df["title"].fillna("Untitled Article")
     df["summary"] = df["summary"].fillna("")
 
@@ -121,12 +122,10 @@ def load_articles():
 
     return df
 
-
 df = load_articles()
 
-
 # -------------------------------------------------
-# BUILD TF-IDF VECTOR MODEL
+# TF-IDF MODEL
 # -------------------------------------------------
 @st.cache_resource
 def build_tfidf(df):
@@ -134,12 +133,10 @@ def build_tfidf(df):
     matrix = vectorizer.fit_transform(df["search_text"])
     return vectorizer, matrix
 
-
 vectorizer, tfidf_matrix = build_tfidf(df)
 
-
 # -------------------------------------------------
-# MATCHING FUNCTION
+# MATCH FUNCTION
 # -------------------------------------------------
 def best_article_match(query):
     if df.empty:
@@ -154,7 +151,6 @@ def best_article_match(query):
 
     return df.iloc[idx], float(scores[idx]), scores
 
-
 # -------------------------------------------------
 # SEARCH BAR
 # -------------------------------------------------
@@ -164,7 +160,6 @@ query = st.text_input(
     "Ask a question or enter fraud-related keywords:",
     placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'..."
 )
-
 
 # -------------------------------------------------
 # PROCESS SEARCH
@@ -184,7 +179,7 @@ if query:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # Main Card
+        # Main Article Card
         st.markdown(f"""
         <div class="card">
             <h3>{article['title']}</h3>
@@ -221,9 +216,8 @@ if query:
                 </div>
                 """, unsafe_allow_html=True)
 
-
 # -------------------------------------------------
-# SEARCH HISTORY + CSV DOWNLOAD
+# SEARCH HISTORY SECTION
 # -------------------------------------------------
 st.subheader("📝 Your Search History")
 
@@ -246,16 +240,26 @@ if st.session_state["search_history"]:
 else:
     st.info("No searches yet.")
 
-
 # -------------------------------------------------
-# ⭐ BULLETPROOF SIMILARITY SECTION (NO HTML TEXT EVER)
+# ⭐ FINAL — BULLETPROOF SIMILARITY CARD USING HTML COMPONENT
 # -------------------------------------------------
 similarity_html = """
-<div class="card">
+<div style="
+    padding:20px;
+    background:white;
+    border:1px solid #E6E9EF;
+    border-radius:12px;
+    margin-top:20px;
+    font-family: 'Segoe UI', sans-serif;
+">
     <h3 style="margin-top:0;">📈 Understanding Similarity Scores</h3>
-    <p>Similarity scores measure how closely your query aligns with article text using TF-IDF + cosine similarity.</p>
 
-    <ul style="font-size:15px; color:#0A1A2F;">
+    <p style="font-size:16px; color:#0A1A2F;">
+        Similarity scores measure how closely your query aligns with article text using TF-IDF +
+        cosine similarity.
+    </p>
+
+    <ul style="font-size:15px; color:#0A1A2F; line-height:1.4;">
         <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
         <li><strong>0.60 – 0.79:</strong> Strong match</li>
         <li><strong>0.40 – 0.59:</strong> Moderate match</li>
@@ -264,4 +268,4 @@ similarity_html = """
 </div>
 """
 
-components.html(similarity_html, height=350)
+components.html(similarity_html, height=350, scrolling=False)
