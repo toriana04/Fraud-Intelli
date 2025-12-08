@@ -10,7 +10,6 @@ inject_light_ui()
 # ------------------------------------------------------
 # LOGO AT THE TOP
 # ------------------------------------------------------
-sidebar_logo()  # keeps logo in sidebar
 
 # Add logo centered at the top of the page (main area)
 st.markdown("""
@@ -89,3 +88,4 @@ st.markdown("""
     This project is intended for educational and analytical purposes only.
 </div>
 """, unsafe_allow_html=True)
+
