@@ -14,37 +14,31 @@ st.set_page_config(page_title="Home | IntelliFraud", layout="wide")
 inject_light_ui()
 
 # ---------------------------------------------------------
-# GLOBAL STYLE FIXES (SEARCH BAR, BUTTONS, BULLETS)
+# GLOBAL STYLE FIXES
 # ---------------------------------------------------------
 st.markdown("""
 <style>
 
-/* --------------------------------------- */
-/* FIX SEARCH BAR (2025 Streamlit selectors) */
-/* --------------------------------------- */
-
-/* Input container */
+/* Light gray search bar */
 .stTextInput > div > div {
-    background-color: #F3F4F6 !important;  /* Light gray */
+    background-color: #F3F4F6 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
 }
 
-/* Placeholder text */
+/* Placeholder text black */
 .stTextInput input::placeholder {
-    color: #000000 !important;   /* Black placeholder */
+    color: #000000 !important;
     opacity: 1 !important;
 }
 
-/* Input text */
+/* Actual typed text */
 .stTextInput input {
     color: #0A1A2F !important;
     font-size: 15px !important;
 }
 
-/* --------------------------------------- */
-/* BUTTON FIXES (Navigation + Download) */
-/* --------------------------------------- */
+/* Buttons (navigation + download) */
 div.stButton > button,
 div.stDownloadButton > button {
     background-color: #F4F5F7 !important;
@@ -54,7 +48,6 @@ div.stDownloadButton > button {
     border-radius: 10px !important;
     font-size: 15px !important;
 }
-
 div.stButton > button:hover,
 div.stDownloadButton > button:hover {
     background-color: #E6EAF0 !important;
@@ -62,9 +55,7 @@ div.stDownloadButton > button:hover {
     color: #0A65FF !important;
 }
 
-/* --------------------------------------- */
-/* FIX INVISIBLE BULLET LISTS */
-/* --------------------------------------- */
+/* Bullet point visibility */
 ul li {
     color: #0A1A2F !important;
     font-size: 15px !important;
@@ -92,23 +83,24 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
 # ---------------------------------------------------------
-# SEARCH HISTORY STATE
+# SEARCH HISTORY STATE (CORRECTED)
 # ---------------------------------------------------------
 if "search_history" not in st.session_state:
-    st.session_state["search_history"] = []
+    st.session_state.search_history = []
 
 
 # ---------------------------------------------------------
-# SEARCH BAR
+# SEARCH BAR (WITH KEY TO PREVENT RESET)
 # ---------------------------------------------------------
 query = st.text_input(
     "🔍 Search IntelliFraud Database",
     placeholder="Search for fraud topics, schemes, keywords, or article summaries...",
+    key="search_input"
 )
 
 
 # ---------------------------------------------------------
-# SEARCH FUNCTION
+# SEARCH FUNCTION (FIXED)
 # ---------------------------------------------------------
 def search_articles(query):
     if query is None or query.strip() == "":
@@ -122,13 +114,21 @@ def search_articles(query):
 
     top_row = df.sort_values("similarity", ascending=False).iloc[0]
 
-    # Save top result to search history
-    st.session_state["search_history"].append({
+    # ----------------------------
+    # FIXED: Prevent duplicate history entries on rerun
+    # ----------------------------
+    history_entry = {
         "query": query,
         "top_title": top_row["title"],
         "similarity": float(top_row["similarity"]),
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
+    }
+
+    if (
+        len(st.session_state.search_history) == 0 or
+        st.session_state.search_history[-1] != history_entry
+    ):
+        st.session_state.search_history.append(history_entry)
 
     return top_row, df.sort_values("similarity", ascending=False).head(5)
 
@@ -186,15 +186,16 @@ with col3:
 st.markdown("---")
 st.subheader("📥 Download Your Search History")
 
-if len(st.session_state["search_history"]) > 0:
-    hist_df = pd.DataFrame(st.session_state["search_history"])
+if len(st.session_state.search_history) > 0:
+    hist_df = pd.DataFrame(st.session_state.search_history)
     csv = hist_df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
         label="⬇️ Download Search History as CSV",
         data=csv,
         file_name="intellifraud_search_history.csv",
-        mime="text/csv"
+        mime="text/csv",
+        key="download_history"
     )
 else:
     st.info("No search history yet.")
@@ -203,7 +204,7 @@ else:
 st.markdown("### 🧹 Manage Search History")
 
 if st.button("❌ Clear Search History"):
-    st.session_state["search_history"] = []
+    st.session_state.search_history = []
     st.success("Search history cleared.")
 
 
