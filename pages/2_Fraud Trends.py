@@ -67,7 +67,7 @@ keyword_freq = pd.Series(all_keywords).value_counts().reset_index()
 keyword_freq.columns = ["keyword", "count"]
 
 # =====================================================
-# SECTION 0 — TOP FRAUD KEYWORDS (AT TOP)
+# SECTION 0 — TOP FRAUD KEYWORDS
 # =====================================================
 st.subheader("🏆 Top Fraud Keywords")
 st.markdown("""
@@ -132,7 +132,7 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-# More restrictive filtering (optimized)
+# Filter stronger edges only
 MIN_EDGE_WEIGHT = 6
 filtered_pairs = {pair: count for pair, count in pair_counts.items() if count >= MIN_EDGE_WEIGHT}
 
@@ -143,6 +143,7 @@ else:
     net.barnes_hut()
 
     keyword_freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
+
     for kw, freq in keyword_freq_map.items():
         if freq > 2:
             net.add_node(
@@ -155,37 +156,37 @@ else:
     for (a, b), weight in filtered_pairs.items():
         net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
 
-    # Optimized visualization settings
+    # ⭐ FIXED JSON — valid for PyVis
     net.set_options("""
-    var options = {
-      nodes: {
-        font: { size: 22, face: "arial", color: "#0A1A2F" },
-        shape: "dot",
-        borderWidth: 1
-      },
-      edges: {
-        width: 2,
-        color: { color: "#0A65FF", highlight: "#003EAA" },
-        smooth: { enabled: true, type: "continuous" }
-      },
-      physics: {
-        enabled: true,
-        stabilization: { iterations: 200 },
-        barnesHut: {
-          gravitationalConstant: -6000,
-          centralGravity: 0.15,
-          springLength: 190,
-          springConstant: 0.025,
-          avoidOverlap: 1
-        }
-      },
-      interaction: {
-        hover: true,
-        zoomView: true,
-        dragView: true
-      }
+{
+  "nodes": {
+    "font": { "size": 22, "face": "arial", "color": "#0A1A2F" },
+    "shape": "dot",
+    "borderWidth": 1
+  },
+  "edges": {
+    "width": 2,
+    "color": { "color": "#0A65FF", "highlight": "#003EAA" },
+    "smooth": { "enabled": true, "type": "continuous" }
+  },
+  "physics": {
+    "enabled": true,
+    "stabilization": { "iterations": 200 },
+    "barnesHut": {
+      "gravitationalConstant": -6000,
+      "centralGravity": 0.15,
+      "springLength": 190,
+      "springConstant": 0.025,
+      "avoidOverlap": 1
     }
-    """)
+  },
+  "interaction": {
+    "hover": true,
+    "zoomView": true,
+    "dragView": true
+  }
+}
+""")
 
     net.save_graph("keyword_network.html")
     HtmlFile = open("keyword_network.html", "r", encoding="utf-8")
