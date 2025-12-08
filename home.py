@@ -14,30 +14,39 @@ st.set_page_config(page_title="Home | IntelliFraud", layout="wide")
 inject_light_ui()
 
 # ---------------------------------------------------------
-# GLOBAL STYLE FIXES (SEARCH BAR + BUTTONS)
+# GLOBAL STYLE FIXES (SEARCH BAR, BUTTONS, BULLETS)
 # ---------------------------------------------------------
 st.markdown("""
 <style>
 
-/* LIGHTER GRAY SEARCH BAR INPUT */
-div[data-baseweb="input"] {
-    background-color: #F9FAFB !important;
+/* --------------------------------------- */
+/* FIX SEARCH BAR (2025 Streamlit selectors) */
+/* --------------------------------------- */
+
+/* Input container background */
+.stTextInput > div > div {
+    background-color: #F3F4F6 !important;  /* Light gray */
     border-radius: 10px !important;
+    border: 1px solid #D1D5DB !important;
 }
 
-/* BLACK PLACEHOLDER TEXT */
-input::placeholder {
-    color: #000000 !important;
+/* Placeholder text color */
+.stTextInput input::placeholder {
+    color: #000000 !important;   /* Black */
     opacity: 1 !important;
 }
 
-/* Actual text color inside input */
-input {
+/* Input text */
+.stTextInput input {
     color: #0A1A2F !important;
+    font-size: 15px !important;
 }
 
-/* FIX BLACK normal BUTTONS */
-div.stButton > button {
+/* --------------------------------------- */
+/* BUTTON FIXES (Navigation + Download) */
+/* --------------------------------------- */
+div.stButton > button,
+div.stDownloadButton > button {
     background-color: #F4F5F7 !important;
     color: #0A1A2F !important;
     border: 1px solid #D0D7E2 !important;
@@ -46,25 +55,20 @@ div.stButton > button {
     font-size: 15px !important;
     transition: all 0.2s ease-in-out;
 }
-div.stButton > button:hover {
+
+div.stButton > button:hover,
+div.stDownloadButton > button:hover {
     background-color: #E6EAF0 !important;
     border-color: #0A65FF !important;
     color: #0A65FF !important;
 }
 
-/* FIX BLACK DOWNLOAD BUTTON */
-div.stDownloadButton > button {
-    background-color: #F4F5F7 !important;
+/* --------------------------------------- */
+/* FIX INVISIBLE BULLET LISTS */
+/* --------------------------------------- */
+ul li {
     color: #0A1A2F !important;
-    border: 1px solid #D0D7E2 !important;
-    padding: 10px 18px !important;
-    border-radius: 10px !important;
     font-size: 15px !important;
-}
-div.stDownloadButton > button:hover {
-    background-color: #E6EAF0 !important;
-    border-color: #0A65FF !important;
-    color: #0A65FF !important;
 }
 
 </style>
@@ -119,7 +123,7 @@ def search_articles(query):
 
     top_row = df.sort_values("similarity", ascending=False).iloc[0]
 
-    # Save only the top article to search history
+    # Save top result to history
     st.session_state["search_history"].append({
         "query": query,
         "top_title": top_row["title"],
@@ -150,7 +154,9 @@ if query:
         ">
             <h3 style="color:#0A65FF; margin-bottom:10px;">{top_result['title']}</h3>
             <p style="font-size:15px; color:#0A1A2F;">{top_result['summary']}</p>
-            <p style="font-size:14px; margin-top:8px;"><strong>Similarity Score:</strong> {top_result['similarity']:.3f}</p>
+            <p style="font-size:14px; margin-top:8px;">
+                <strong>Similarity Score:</strong> {top_result['similarity']:.3f}
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -195,7 +201,6 @@ else:
     st.info("No search history yet.")
 
 
-# CLEAR HISTORY BUTTON
 st.markdown("### 🧹 Manage Search History")
 
 if st.button("❌ Clear Search History"):
@@ -209,6 +214,7 @@ if st.button("❌ Clear Search History"):
 st.markdown("---")
 st.markdown("""
 ### ❓ How Similarity Scores Work
+
 Similarity scores measure how closely your search matches each article using semantic embeddings.
 
 - **0.85 – 1.00 → Extremely relevant**  
