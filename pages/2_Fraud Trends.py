@@ -37,7 +37,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Keep sidebar logo if you still want it there (remove if not needed)
-sidebar_logo()
+# sidebar_logo()
 
 # ---------------------------------------------
 # HEADER HERO
@@ -235,4 +235,5 @@ if search_value:
     table = table[table["keyword"].str.contains(search_value, case=False)]
 
 st.dataframe(table, use_container_width=True)
+
 
