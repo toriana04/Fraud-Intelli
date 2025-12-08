@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
+# NEW — load live data from Supabase
+from load_data_supabase import load_fraud_data
+
 # ---------------------------------------------
 # PAGE CONFIG & UI
 # ---------------------------------------------
@@ -31,22 +34,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# LOAD DATA & KEYWORDS
+# LOAD SUPABASE DATA
 # ---------------------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
-    df["keywords"] = df["keywords"].fillna("").apply(
-        lambda x: [k.strip().lower() for k in x.split(",") if k.strip()]
+    df = load_fraud_data()  # REAL Supabase dataset
+
+    # Ensure parsed keywords
+    df["keywords"] = df["keywords"].apply(
+        lambda x: x if isinstance(x, list) else []
     )
+
     return df
 
 df = load_data()
 
-all_keywords = sorted({kw for lst in df["keywords"] for kw in lst})
+# gather unique keywords
+all_keywords = sorted({kw for kw_list in df["keywords"] for kw in kw_list})
 
 # ---------------------------------------------
-# FRAUD TYPE DEFINITIONS (Your curated list)
+# FRAUD TYPE DEFINITIONS (unchanged)
 # ---------------------------------------------
 FRAUD_TYPES = {
     "Investment Fraud": "Deceptive practices that induce investors to make financial decisions based on misleading or incomplete information.",
@@ -86,13 +93,13 @@ DEFAULT_DEFINITIONS = {
 }
 
 def get_definition(term):
-    """Return an official or fallback definition."""
+    """Return known definition or fallback."""
     if term in DEFAULT_DEFINITIONS:
         return DEFAULT_DEFINITIONS[term]
     return f"{term.capitalize()} refers to activity commonly associated with financial misconduct or fraud-related risk."
 
 # ---------------------------------------------
-# SECTION 1 — Major Fraud Types
+# SECTION 1 — MAJOR FRAUD TYPES
 # ---------------------------------------------
 st.subheader("🧭 Major Types of Fraud")
 
@@ -114,7 +121,7 @@ for fraud_type, definition in FRAUD_TYPES.items():
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# SECTION 2 — Search Field
+# SECTION 2 — SEARCH FIELD
 # ---------------------------------------------
 st.subheader("🔍 Search Fraud Terms (Keywords from Articles)")
 
@@ -123,10 +130,12 @@ search = st.text_input(
     placeholder="Type a term such as 'phishing', 'laundering', 'identity'..."
 ).lower().strip()
 
-filtered_keywords = [kw for kw in all_keywords if search in kw] if search else all_keywords
+filtered_keywords = (
+    [kw for kw in all_keywords if search in kw] if search else all_keywords
+)
 
 # ---------------------------------------------
-# SECTION 3 — Keyword Glossary
+# SECTION 3 — KEYWORD GLOSSARY
 # ---------------------------------------------
 st.subheader("📖 Keyword Glossary Derived from Articles")
 
@@ -134,6 +143,7 @@ if not filtered_keywords:
     st.info("No matching terms found.")
 else:
     for term in filtered_keywords:
+        definition = get_definition(term)
         st.markdown(f"""
         <div style="
             padding:14px; 
@@ -145,7 +155,7 @@ else:
         ">
             <h3 style="color:#0A65FF; margin-bottom:6px;">{term.capitalize()}</h3>
             <p style="font-size:15px; color:#0A1A2F; line-height:1.5;">
-                {get_definition(term)}
+                {definition}
             </p>
         </div>
         """, unsafe_allow_html=True)
