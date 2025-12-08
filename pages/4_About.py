@@ -6,7 +6,6 @@ from intellifraud_ui import inject_light_ui, sidebar_logo
 # ------------------------------------------------------
 st.set_page_config(page_title="About IntelliFraud", layout="wide")
 inject_light_ui()
-sidebar_logo()
 
 # ------------------------------------------------------
 # LOGO AT THE TOP
@@ -93,3 +92,4 @@ st.markdown(
 """,
     unsafe_allow_html=True
 )
+
