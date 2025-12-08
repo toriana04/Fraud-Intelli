@@ -2,27 +2,27 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from intellifraud_ui import inject_light_ui   # 👉 REMOVED sidebar_logo import
+from intellifraud_ui import inject_light_ui  # sidebar_logo removed
+from datetime import datetime
 
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 
 inject_light_ui()
-# sidebar_logo()   👉 REMOVED (you want logo at top)
 
 # -------------------------------------------------
-# CUSTOM CSS FOR SEARCH BAR + LOGO AT TOP
+# CUSTOM CSS FOR SEARCH BAR + LOGO FIXES
 # -------------------------------------------------
 st.markdown("""
 <style>
 
 .stTextInput > div > div {
-    background-color: #F3F4F6 !important;   /* Light gray */
+    background-color: #F3F4F6 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
 }
 
 .stTextInput input::placeholder {
-    color: #000000 !important;  /* Black placeholder */
+    color: #000 !important;
     opacity: 1 !important;
 }
 
@@ -31,7 +31,6 @@ st.markdown("""
     font-size: 15px !important;
 }
 
-/* Fix HTML card styles showing raw text */
 .card {
     padding: 20px;
     background: white;
@@ -52,15 +51,15 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ----------------------------------------------
-# Search history state
-# ----------------------------------------------
+# -------------------------------------------------
+# SEARCH HISTORY STATE
+# -------------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
-# ----------------------------------------------
-# Header Section
-# ----------------------------------------------
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
 st.markdown("""
 <div class="card" style="padding:25px; margin-bottom:20px;">
     <h1 style="margin-bottom: 5px;">🔍 Welcome to IntelliFraud</h1>
@@ -71,25 +70,29 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ----------------------------------------------
-# Load article data
-# ----------------------------------------------
+# -------------------------------------------------
+# LOAD ARTICLE DATA
+# -------------------------------------------------
 @st.cache_data
 def load_data():
     df = pd.read_csv("fraud_analysis_final.csv")
-    df["keywords_clean"] = df["keywords"].fillna("").astype(str)
+    df["keywords"] = df["keywords"].fillna("")
+    df["summary"] = df["summary"].fillna("")
+    df["title"] = df["title"].fillna("Untitled Article")
+
     df["search_text"] = (
-        df["title"].fillna("") + " " +
-        df["summary"].fillna("") + " " +
-        df["keywords_clean"]
+        df["title"] + " " +
+        df["summary"] + " " +
+        df["keywords"]
     ).str.lower()
+
     return df
 
 df = load_data()
 
-# ----------------------------------------------
-# TF-IDF Model
-# ----------------------------------------------
+# -------------------------------------------------
+# BUILD TF-IDF MODEL
+# -------------------------------------------------
 @st.cache_resource
 def build_tfidf():
     vectorizer = TfidfVectorizer(stop_words="english")
@@ -98,18 +101,28 @@ def build_tfidf():
 
 vectorizer, tfidf_matrix = build_tfidf()
 
-# ----------------------------------------------
-# Best match function
-# ----------------------------------------------
+# -------------------------------------------------
+# SAFE MATCH FUNCTION (Fixes your crash)
+# -------------------------------------------------
 def best_article_match(query):
     query_vec = vectorizer.transform([query.lower()])
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
+
+    # If TF-IDF returns nothing / df empty
+    if len(scores) == 0 or df.empty:
+        return None, 0.0, scores
+
     idx = scores.argmax()
+
+    # If index is outside DataFrame range
+    if idx >= len(df):
+        return None, 0.0, scores
+
     return df.iloc[idx], float(scores[idx]), scores
 
-# ----------------------------------------------
-# Search Bar
-# ----------------------------------------------
+# -------------------------------------------------
+# SEARCH BAR
+# -------------------------------------------------
 st.subheader("🔎 Search Across IntelliFraud")
 
 query = st.text_input(
@@ -117,59 +130,66 @@ query = st.text_input(
     placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'..."
 )
 
+# -------------------------------------------------
+# SEARCH EXECUTION
+# -------------------------------------------------
 if query:
-    # Get match results
     article, score, score_list = best_article_match(query)
 
-    st.session_state["search_history"].append({
-        "query": query,
-        "article_title": article["title"],
-        "keywords": article["keywords"],
-        "similarity_score": round(score, 4),
-        "url": article["url"],
-    })
+    if article is None:
+        st.error("⚠️ No matching results were found for your search.")
+    else:
+        # save search history
+        st.session_state["search_history"].append({
+            "query": query,
+            "article_title": article["title"],
+            "keywords": article["keywords"],
+            "similarity_score": round(score, 4),
+            "url": article["url"],
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
 
-    # Top match card
-    st.markdown(f"""
-    <div class="card">
-        <h3>{article['title']}</h3>
-        <p>{article['summary']}</p>
-        <p><strong>Keywords:</strong> {article['keywords']}</p>
-        <p><strong>Similarity Score:</strong> {score:.2f}</p>
-        <a href="{article['url']}" target="_blank"><strong>Read Full Article →</strong></a>
-    </div>
-    """, unsafe_allow_html=True)
+        # Display main article
+        st.markdown(f"""
+        <div class="card">
+            <h3>{article['title']}</h3>
+            <p>{article['summary']}</p>
+            <p><strong>Keywords:</strong> {article['keywords']}</p>
+            <p><strong>Similarity Score:</strong> {score:.2f}</p>
+            <a href="{article['url']}" target="_blank"><strong>Read Full Article →</strong></a>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Related articles
-    st.subheader("📌 Related Articles")
+        # Related Articles
+        st.subheader("📌 Related Articles")
 
-    top_keywords = set(article["keywords"].lower().replace(",", "").split())
-    ranked = score_list.argsort()[::-1][1:15]
+        top_keywords = set(article["keywords"].lower().replace(",", "").split())
+        ranked = score_list.argsort()[::-1][1:15]
 
-    shown = 0
-    for idx in ranked:
-        row = df.iloc[idx]
-        row_keywords = set(row["keywords"].lower().replace(",", "").split())
-        overlap = top_keywords & row_keywords
+        shown = 0
+        for idx in ranked:
+            row = df.iloc[idx]
+            row_keywords = set(row["keywords"].lower().replace(",", "").split())
+            overlap = top_keywords & row_keywords
 
-        if len(overlap) >= 2:
-            shown += 1
-            if shown > 3:
-                break
+            if len(overlap) >= 2:
+                shown += 1
+                if shown > 3:
+                    break
 
-            st.markdown(f"""
-            <div class="card">
-                <h4>{row['title']}</h4>
-                <p>{row['summary'][:220]}...</p>
-                <p><strong>Shared Keywords:</strong> {', '.join(overlap)}</p>
-                <p><strong>Similarity Score:</strong> {score_list[idx]:.2f}</p>
-                <a href="{row['url']}" target="_blank"><strong>Read Article →</strong></a>
-            </div>
-            """, unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="card">
+                    <h4>{row['title']}</h4>
+                    <p>{row['summary'][:220]}...</p>
+                    <p><strong>Shared Keywords:</strong> {', '.join(overlap)}</p>
+                    <p><strong>Similarity Score:</strong> {score_list[idx]:.2f}</p>
+                    <a href="{row['url']}" target="_blank"><strong>Read Article →</strong></a>
+                </div>
+                """, unsafe_allow_html=True)
 
-# ----------------------------------------------
-# Feature Cards
-# ----------------------------------------------
+# -------------------------------------------------
+# FEATURE CARDS
+# -------------------------------------------------
 st.subheader("📂 Navigate IntelliFraud")
 
 features = [
@@ -189,9 +209,9 @@ for col, item in zip([c1, c2, c3, c4], features):
         </div>
         """, unsafe_allow_html=True)
 
-# ----------------------------------------------
-# Search History
-# ----------------------------------------------
+# -------------------------------------------------
+# SEARCH HISTORY
+# -------------------------------------------------
 st.subheader("📝 Your Search History")
 
 if st.button("Clear Search History"):
@@ -204,9 +224,9 @@ else:
     hist_df = pd.DataFrame(st.session_state["search_history"])
     st.dataframe(hist_df, use_container_width=True)
 
-# ----------------------------------------------
-# FIXED SIMILARITY EXPLANATION (Shows correctly)
-# ----------------------------------------------
+# -------------------------------------------------
+# SIMILARITY EXPLANATION (FIXED)
+# -------------------------------------------------
 st.markdown("""
 <div class="card">
     <h3>📈 Understanding Similarity Scores</h3>
