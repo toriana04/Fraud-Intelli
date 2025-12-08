@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import seaborn as sns
-import matplotlib.pyplot as plt
 import itertools
-import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
 
@@ -19,7 +16,7 @@ inject_light_ui()
 sidebar_logo()
 
 # ---------------------------------------------
-# HEADER
+# HEADER HERO
 # ---------------------------------------------
 st.markdown("""
 <div style="
@@ -40,23 +37,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# LOAD DATA FROM SUPABASE
+# LOAD DATA
 # ---------------------------------------------
 @st.cache_data
 def load_data():
     df = load_fraud_data()
-
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    def ensure_list(x):
-        if isinstance(x, list):
-            return x
+    def ensure_list(val):
+        if isinstance(val, list):
+            return val
         try:
-            return eval(x)
+            return eval(val)
         except:
             return []
     df["keywords"] = df["keywords"].apply(ensure_list)
-
     return df
 
 df = load_data()
@@ -68,16 +63,11 @@ all_keywords = [kw for lst in df["keywords"] for kw in lst]
 keyword_freq = pd.Series(all_keywords).value_counts().reset_index()
 keyword_freq.columns = ["keyword", "count"]
 
-
 # =====================================================
-# SECTION 0 — TOP FRAUD KEYWORDS (MOVED TO TOP)
+# SECTION 0 — TOP KEYWORDS
 # =====================================================
 st.subheader("🏆 Top Fraud Keywords")
-st.markdown("""
-<p style='font-size:16px; margin-top:-10px; color:#0A1A2F;'>
-A snapshot of the most common fraud-related keywords.
-</p>
-""", unsafe_allow_html=True)
+st.markdown("<p style='color:#0A1A2F;'>Most common fraud-related keywords.</p>", unsafe_allow_html=True)
 
 for _, row in keyword_freq.head(10).iterrows():
     st.markdown(f"""
@@ -96,34 +86,8 @@ for _, row in keyword_freq.head(10).iterrows():
     </div>
     """, unsafe_allow_html=True)
 
-
 # =====================================================
-# SECTION 1 — HEATMAP (DAY vs HOUR)
-# =====================================================
-st.subheader("🔥 Fraud Mentions Heatmap (Day vs Hour)")
-st.markdown("<p style='color:#0A1A2F;'>When do enforcement actions peak?</p>", unsafe_allow_html=True)
-
-df["day_of_week"] = df["timestamp"].dt.day_name()
-df["hour"] = df["timestamp"].dt.hour
-
-heatmap_data = df.pivot_table(
-    index="day_of_week",
-    columns="hour",
-    values="title",
-    aggfunc="count"
-).fillna(0)
-
-ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-heatmap_data = heatmap_data.reindex(ordered_days)
-
-fig, ax = plt.subplots(figsize=(14, 6))
-sns.heatmap(heatmap_data, cmap="Blues", linewidths=.5, ax=ax)
-ax.set_title("Fraud Mentions by Day & Hour")
-st.pyplot(fig)
-
-
-# =====================================================
-# SECTION 2 — KEYWORD BAR CHART
+# SECTION 1 — BAR CHART
 # =====================================================
 st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
 
@@ -135,19 +99,19 @@ bar_chart = (
         y=alt.Y("keyword:N", sort="-x", title="Keyword"),
         tooltip=["keyword", "count"]
     )
-    .properties(height=500)
+    .properties(height=480)
 )
 
 st.altair_chart(bar_chart, use_container_width=True)
 
+# =====================================================
+# SECTION 2 — OPTIMIZED INTERACTIVE NETWORK GRAPH
+# =====================================================
+st.subheader("🕸️ Interactive Keyword Network (Optimized)")
 
-# =====================================================
-# SECTION 3 — INTERACTIVE NETWORK GRAPH (PyVis)
-# =====================================================
-st.subheader("🕸️ Interactive Keyword Network")
 st.markdown("""
 <p style='color:#0A1A2F;'>
-Drag nodes • Hover to see connections • Zoom to explore the fraud landscape.
+Drag nodes • Hover for connections • Zoom to explore the fraud landscape.
 </p>
 """, unsafe_allow_html=True)
 
@@ -162,65 +126,81 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-MIN_EDGE_WEIGHT = 3
-filtered_pairs = {p: w for p, w in pair_counts.items() if w >= MIN_EDGE_WEIGHT}
+# STRONG EDGE FILTER
+MIN_EDGE_WEIGHT = 6
+filtered_pairs = {pair: c for pair, c in pair_counts.items() if c >= MIN_EDGE_WEIGHT}
 
-net = Network(height="700px", width="100%", bgcolor="#FFFFFF", font_color="#0A1A2F")
-net.barnes_hut(gravity=-20000, central_gravity=0.3, spring_length=150, spring_strength=0.02)
+if not filtered_pairs:
+    st.warning("Not enough keyword connections to build a network.")
+else:
+    net = Network(height="650px", width="100%", bgcolor="#FFFFFF", font_color="#0A1A2F")
+    net.barnes_hut()
 
-for (a, b), weight in filtered_pairs.items():
-    net.add_node(a, label=a, color="#78C2FF")
-    net.add_node(b, label=b, color="#78C2FF")
-    net.add_edge(a, b, value=weight, title=f"Co-occurrence: {weight}")
+    freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
 
-net.set_options("""
-const options = {
-  nodes: {
-    shape: "dot",
-    scaling: { min: 8, max: 40 },
-    font: { size: 16, color: "#0A1A2F" }
+    # Add nodes
+    for kw, freq in freq_map.items():
+        if freq > 2:
+            net.add_node(
+                kw,
+                label=kw,
+                size=min(freq * 2, 45),
+                color="#0A65FF"
+            )
+
+    # Add edges
+    for (a, b), weight in filtered_pairs.items():
+        net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
+
+    # ⭐ FINAL SMOOTH-DRAG PHYSICS (NO SNAPPING)
+    net.set_options("""
+{
+  "nodes": {
+    "font": { "size": 22, "face": "arial", "color": "#0A1A2F" },
+    "shape": "dot",
+    "borderWidth": 1
   },
-  edges: {
-    color: "#888",
-    smooth: true
+  "edges": {
+    "width": 2,
+    "color": { "color": "#0A65FF", "highlight": "#003EAA" },
+    "smooth": { "enabled": true, "type": "continuous" }
   },
-  physics: {
-    enabled: true,
-    barnesHut: {
-      gravitationalConstant: -20000,
-      springLength: 150,
-      springConstant: 0.02
+  "physics": {
+    "enabled": true,
+    "stabilization": {
+      "enabled": true,
+      "iterations": 150
+    },
+    "barnesHut": {
+      "gravitationalConstant": -2500,
+      "centralGravity": 0.10,
+      "springLength": 240,
+      "springConstant": 0.010,
+      "avoidOverlap": 1
     }
+  },
+  "interaction": {
+    "hover": true,
+    "zoomView": true,
+    "dragView": true,
+    "dragNodes": true
   }
 }
 """)
 
-net.save_graph("interactive_keywords.html")
-HtmlFile = open("interactive_keywords.html", "r", encoding="utf-8")
-source_code = HtmlFile.read()
-components.html(source_code, height=750, scrolling=True)
-
+    net.save_graph("keyword_network.html")
+    HtmlFile = open("keyword_network.html", "r", encoding="utf-8")
+    components.html(HtmlFile.read(), height=650, scrolling=True)
 
 # =====================================================
-# SECTION 4 — FULL KEYWORD LIST
+# SECTION 3 — FULL KEYWORD TABLE
 # =====================================================
-st.subheader("📖 Full Fraud Keyword List")
+st.subheader("📚 Full Fraud Keyword List")
 
-for _, row in keyword_freq.iterrows():
-    st.markdown(f"""
-    <div style="
-        padding:14px; 
-        margin-bottom:12px; 
-        border-radius:10px; 
-        background-color:#FFFFFF; 
-        border:1px solid #E6E9EF;
-        box-shadow:0 1px 3px rgba(0,0,0,0.05);
-    ">
-        <h3 style="color:#0A65FF; margin-bottom:4px;">
-            {row['keyword'].capitalize()}
-        </h3>
-        <p style="font-size:15px; margin:0; color:#0A1A2F;">
-            <strong>Frequency:</strong> {row['count']}
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+search = st.text_input("Search keywords:")
+table = keyword_freq.copy()
+
+if search:
+    table = table[table["keyword"].str.contains(search, case=False)]
+
+st.dataframe(table, use_container_width=True)
