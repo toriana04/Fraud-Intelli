@@ -39,7 +39,7 @@ st.markdown("""
 def load_data():
     df = load_fraud_data()
 
-    # Parse keywords if necessary
+    # Parse keywords properly
     df["keywords"] = df["keywords"].apply(
         lambda x: x if isinstance(x, list) else []
     )
@@ -47,49 +47,165 @@ def load_data():
 
 df = load_data()
 
-# gather unique keywords
+# Gather and normalize unique keywords
 all_keywords = sorted({kw.lower().strip() for kw_list in df["keywords"] for kw in kw_list})
 
-# ---------------------------------------------
-# EXPANDED KEYWORD DEFINITIONS (MUCH BROADER)
-# ---------------------------------------------
-KEYWORD_DEFINITIONS = {
-    "ponzi scheme": "A fraud where returns for older investors are paid using new investor funds rather than actual profits.",
-    "ponzi": "A form of investment fraud using new investor money to pay old investors.",
-    "scam": "A deceptive operation intended to defraud a victim.",
-    "fraud": "Intentional deception for financial or personal gain.",
-    "securities fraud": "Illegal manipulation or deception in stock or commodities markets.",
-    "insider trading": "Buying or selling securities based on confidential, non-public information.",
-    "phishing": "A cyberattack where criminals impersonate trusted entities to steal data.",
-    "smishing": "Text-message-based phishing designed to steal credentials or money.",
-    "vishing": "Voice-based phishing using fraudulent phone calls.",
-    "money laundering": "The process of disguising illegally obtained money as legitimate income.",
-    "identity theft": "Using another person's personal information without permission for fraud.",
-    "market manipulation": "Artificially influencing market prices or trading volume.",
-    "investment fraud": "Deceiving investors using false information, fake opportunities, or misleading claims.",
-    "account takeover": "Unauthorized access and control of a victim's login-protected accounts.",
-    "cyber fraud": "Fraud executed through digital systems, malware, or unauthorized access.",
-    "credit card fraud": "Unauthorized use of a cardholder’s financial information.",
-    "wire fraud": "Using electronic communications (email, phone, internet) to execute a fraudulent scheme.",
-    "elder fraud": "Scams that target older adults through coercion, deception, or financial manipulation.",
-    "pump and dump": "Artificially inflating a stock price through misleading statements before selling it off.",
-}
 
-def get_definition(term):
-    """Match definitions flexibly and avoid repetitive fallback text."""
+# ---------------------------------------------
+# NLP-BASED SMART DEFINITION ENGINE (Option C)
+# ---------------------------------------------
+import re
+
+def generate_smart_definition(term):
+    """
+    Automatically generate a fraud-aware, context-sensitive definition.
+    Fraud-heavy terms get strong definitions; generic words get soft contextual ones.
+    """
     t = term.lower().strip()
 
-    # Direct match
-    if t in KEYWORD_DEFINITIONS:
-        return KEYWORD_DEFINITIONS[t]
+    # ----------------------------------------------------------
+    # 1. Strong fraud / cyber / finance category classifications
+    # ----------------------------------------------------------
 
-    # Partial match (e.g., "phishing scams" → "phishing")
-    for key in KEYWORD_DEFINITIONS:
-        if key in t:
-            return KEYWORD_DEFINITIONS[key]
+    # Cyber Fraud Terms
+    cyber_patterns = [
+        "phish", "smish", "vish", "malware", "botnet", "breach",
+        "credential", "ransom", "trojan", "spyware", "ddos",
+        "spoof", "hack", "cyber", "attack"
+    ]
+    if any(p in t for p in cyber_patterns):
+        return (
+            f"{term.capitalize()} refers to cyber or digital threat activity commonly used "
+            "to steal credentials, access accounts, or compromise financial systems."
+        )
 
-    # Unique fallback (no repetition)
-    return f"{term.capitalize()} is a term commonly associated with fraud, risk, or financial misconduct within regulatory and compliance contexts."
+    # Crypto Fraud Terms
+    crypto_patterns = [
+        "crypto", "bitcoin", "wallet", "token", "nft", "blockchain", "defi"
+    ]
+    if any(p in t for p in crypto_patterns):
+        return (
+            f"{term.capitalize()} relates to digital assets or blockchain-based financial activity, "
+            "which can be targeted through scams, unauthorized transfers, or misleading investment schemes."
+        )
+
+    # Financial & Investment Fraud Terms
+    financial_patterns = [
+        "investment", "investing", "investor", "investors", "securities",
+        "broker", "brokerage", "stock", "stocks", "market", "markets",
+        "pump", "dump", "forex", "finra", "fincen", "fintech",
+        "finfluencers", "finfluencer", "finpro"
+    ]
+    if any(p in t for p in financial_patterns):
+        return (
+            f"{term.capitalize()} is associated with financial markets, brokerage services, or investment "
+            "activity, which may be vulnerable to manipulation, misrepresentation, or fraud."
+        )
+
+    # Money Laundering & Financial Crime
+    laundering_patterns = [
+        "launder", "laundering", "embezzle", "fraudul", "fraudster",
+        "fraudsters", "frauds", "fraud"
+    ]
+    if any(p in t for p in laundering_patterns):
+        return (
+            f"{term.capitalize()} refers to illicit financial activity involving deception, "
+            "concealment of funds, or manipulation of financial transactions for unlawful gain."
+        )
+
+    # Identity Theft & Credential Misuse
+    identity_patterns = [
+        "identity", "id", "takeover", "compromised", "account",
+        "ssn", "imposter", "impersonation", "authentication"
+    ]
+    if any(p in t for p in identity_patterns):
+        return (
+            f"{term.capitalize()} relates to identity misuse, unauthorized account access, or credential theft "
+            "commonly observed in fraud events."
+        )
+
+    # Social Engineering & Scam Tactics
+    scam_patterns = [
+        "scam", "scams", "scammer", "scammers", "scheme", "sweepstakes",
+        "telemarketing", "telemarketers"
+    ]
+    if any(p in t for p in scam_patterns):
+        return (
+            f"{term.capitalize()} involves deceptive communication intended to manipulate victims into "
+            "sending money, revealing information, or granting unauthorized access."
+        )
+
+    # Mail Theft / Interception
+    mail_patterns = [
+        "mail", "mailbox", "mailboxes", "postal", "fedex", "usps",
+        "envelopes", "deliveries", "courier"
+    ]
+    if any(p in t for p in mail_patterns):
+        return (
+            f"{term.capitalize()} is referenced in fraud cases involving stolen mail, intercepted packages, "
+            "or unauthorized redirection of delivery services."
+        )
+
+    # Elder / Vulnerable Populations Fraud
+    elder_patterns = [
+        "elder", "elderly", "retirees", "seniors", "vulnerable"
+    ]
+    if any(p in t for p in elder_patterns):
+        return (
+            f"{term.capitalize()} is often used in discussions of fraud targeting older adults, who may be "
+            "more vulnerable to coercion, deception, or financial exploitation."
+        )
+
+    # Regulatory / Compliance Terms
+    regulatory_patterns = [
+        "sec", "compliance", "committee", "committees", "subcommittee",
+        "regulatory", "enforcement", "filings", "initiatives", "officers"
+    ]
+    if any(p in t for p in regulatory_patterns):
+        return (
+            f"{term.capitalize()} is frequently referenced in regulatory, oversight, or compliance contexts "
+            "related to preventing, monitoring, or responding to fraud."
+        )
+
+    # ----------------------------------------------------------
+    # 2. Generic soft-context definitions for non-fraud words
+    # ----------------------------------------------------------
+    soft_context_words = [
+        # Administrative / organizational
+        "agencies", "committee", "committees", "shareholders", "firms",
+        "officers", "provider", "providers", "institutions", "notes",
+
+        # Technology / devices
+        "technology", "mobile", "smartphones", "phones", "sim",
+
+        # Generic business or financial words
+        "finance", "financial", "transactions", "exchanges", "markets",
+        "offerings", "loans", "collateral",
+
+        # Misc context terms
+        "checklist", "initiatives", "legitimate", "increasingly",
+        "breakthroughs", "carrier", "estate", "survey", "surveys",
+        "vulnerable", "consumer", "consumers"
+    ]
+
+    if t in soft_context_words or len(t.split()) == 1:
+        return (
+            f"{term.capitalize()} is referenced in discussions related to fraud, compliance, or financial safety, "
+            "serving as contextual information rather than describing a specific fraud technique."
+        )
+
+    # ----------------------------------------------------------
+    # 3. Final fallback (rarely used now)
+    # ----------------------------------------------------------
+    return (
+        f"{term.capitalize()} is mentioned in fraud-related contexts and contributes to understanding patterns, "
+        "risks, or discussions surrounding financial crime."
+    )
+
+
+def get_definition(term):
+    return generate_smart_definition(term)
+
 
 # ---------------------------------------------
 # SECTION 1 — MAJOR FRAUD TYPES
@@ -105,19 +221,19 @@ FRAUD_TYPES = {
     "Wire Fraud": "Fraud using electronic communication such as phone, internet, or email.",
     "Phishing": "Impersonation attacks to steal sensitive information.",
     "Elder Fraud": "Financial exploitation targeting older adults.",
-    "Affinity Fraud": "Scams targeting members of identifiable social or community groups.",
+    "Affinity Fraud": "Scams targeting identifiable community groups.",
     "Insider Trading": "Illegal trading of securities based on confidential information.",
     "Market Manipulation": "Artificially influencing market activity or prices.",
-    "Ponzi Scheme": "Paying earlier investors with funds from new investors rather than profit.",
+    "Ponzi Scheme": "Paying earlier investors with funds from new investors rather than profits.",
 }
 
 for fraud_type, definition in FRAUD_TYPES.items():
     st.markdown(f"""
     <div style="
-        padding:14px; 
-        margin-bottom:12px; 
-        border-radius:10px; 
-        background-color:#FFFFFF; 
+        padding:14px;
+        margin-bottom:12px;
+        border-radius:10px;
+        background-color:#FFFFFF;
         border:1px solid #E6E9EF;
         box-shadow:0 1px 3px rgba(0,0,0,0.05);
     ">
@@ -129,7 +245,7 @@ for fraud_type, definition in FRAUD_TYPES.items():
     """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# SECTION 2 — SEARCH FIELD
+# SECTION 2 — SEARCH BAR
 # ---------------------------------------------
 st.subheader("🔍 Search Fraud Terms (Keywords from Articles)")
 
