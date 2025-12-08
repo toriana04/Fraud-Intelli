@@ -11,3 +11,4 @@ python-dotenv
 altair
 matplotlib
 seaborn
+pyvis
