@@ -2,12 +2,55 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from intellifraud_ui import inject_light_ui, sidebar_logo
+from intellifraud_ui import inject_light_ui   # 👉 REMOVED sidebar_logo import
 
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 
 inject_light_ui()
-sidebar_logo()
+# sidebar_logo()   👉 REMOVED (you want logo at top)
+
+# -------------------------------------------------
+# CUSTOM CSS FOR SEARCH BAR + LOGO AT TOP
+# -------------------------------------------------
+st.markdown("""
+<style>
+
+.stTextInput > div > div {
+    background-color: #F3F4F6 !important;   /* Light gray */
+    border-radius: 10px !important;
+    border: 1px solid #D1D5DB !important;
+}
+
+.stTextInput input::placeholder {
+    color: #000000 !important;  /* Black placeholder */
+    opacity: 1 !important;
+}
+
+.stTextInput input {
+    color: #0A1A2F !important;
+    font-size: 15px !important;
+}
+
+/* Fix HTML card styles showing raw text */
+.card {
+    padding: 20px;
+    background: white;
+    border: 1px solid #E6E9EF;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------
+# LOGO AT TOP
+# -------------------------------------------------
+st.markdown("""
+<div style="text-align:center; margin-bottom: 25px;">
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="240" style="border-radius:15px;">
+</div>
+""", unsafe_allow_html=True)
 
 # ----------------------------------------------
 # Search history state
@@ -162,7 +205,7 @@ else:
     st.dataframe(hist_df, use_container_width=True)
 
 # ----------------------------------------------
-# Explanation Card
+# FIXED SIMILARITY EXPLANATION (Shows correctly)
 # ----------------------------------------------
 st.markdown("""
 <div class="card">
