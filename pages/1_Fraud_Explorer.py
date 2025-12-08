@@ -10,7 +10,7 @@ st.set_page_config(page_title="Fraud Explorer", layout="wide")
 inject_light_ui()
 
 # ------------------------------------------------------------
-# TOP LOGO (same as home page)
+# TOP LOGO
 # ------------------------------------------------------------
 st.markdown("""
 <div style="text-align:center; margin-bottom:25px;">
@@ -19,32 +19,56 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# MATCH HOME PAGE DROPDOWN / SEARCH BAR CSS
+# MATCH HOME PAGE SEARCH BAR STYLING FOR DROPDOWN + BLACK TEXT
 # ------------------------------------------------------------
 st.markdown("""
 <style>
 
+/* Wrapper styling (same as search bar) */
 .stSelectbox > div > div {
     background-color: #F3F4F6 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
-    padding: 6px !important;
+    padding: 8px !important;
 }
 
-.stSelectbox select {
+/* Selected option text */
+.stSelectbox div[data-baseweb="select"] div[class*="singleValue"] {
+    color: #0A1A2F !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+}
+
+/* Placeholder text */
+.stSelectbox div[data-baseweb="select"] div[class*="placeholder"] {
+    color: #0A1A2F !important;
+    opacity: 0.75 !important;
+    font-size: 15px !important;
+}
+
+/* Dropdown menu text */
+.stSelectbox div[data-baseweb="popover"] div[role="option"] {
     color: #0A1A2F !important;
     font-size: 15px !important;
 }
 
-.stSelectbox div[data-baseweb="select"] > div {
-    background-color: #F3F4F6 !important;
+/* Hover highlight */
+.stSelectbox div[data-baseweb="popover"] div[role="option"]:hover {
+    background-color: #E6EAF0 !important;
+    color: #0A65FF !important;
+}
+
+/* Focused item */
+.stSelectbox div[data-baseweb="popover"] div[role="option"][aria-selected="true"] {
+    background-color: #E6EAF0 !important;
+    color: #0A65FF !important;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# LOAD DATA (Supabase)
+# LOAD DATA FROM SUPABASE
 # ------------------------------------------------------------
 @st.cache_data
 def load_data():
@@ -54,7 +78,7 @@ def load_data():
 df = load_data()
 
 # ------------------------------------------------------------
-# FRAUD CATEGORIES
+# CATEGORY DEFINITIONS
 # ------------------------------------------------------------
 FRAUD_CATEGORIES = {
     "Investment Fraud": [
@@ -88,7 +112,7 @@ for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
 # ------------------------------------------------------------
-# MATCHING FUNCTIONS
+# MATCHING LOGIC
 # ------------------------------------------------------------
 def match_score(article_keywords, category_keywords):
     score = 0
@@ -105,6 +129,7 @@ def get_articles(category_name):
     for _, row in df.iterrows():
         keywords_list = row["keywords"] if isinstance(row["keywords"], list) else []
         score = match_score(keywords_list, cat_keywords)
+
         if score > 0:
             results.append((score, row))
 
@@ -112,7 +137,7 @@ def get_articles(category_name):
     return [row for score, row in results]
 
 # ------------------------------------------------------------
-# HEADER
+# PAGE HEADER
 # ------------------------------------------------------------
 st.markdown("""
 <div style="
@@ -132,7 +157,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# CATEGORY PICKER (NOW MATCHES HOME SEARCH BAR)
+# CATEGORY PICKER (NOW STYLED)
 # ------------------------------------------------------------
 st.subheader("🧭 Select a Fraud Category")
 
@@ -147,7 +172,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------
-# DISPLAY MATCHING ARTICLES
+# MATCHING ARTICLES DISPLAY
 # ------------------------------------------------------------
 articles = get_articles(selected_category)
 
@@ -172,8 +197,3 @@ else:
             <h3 style="color:#0A1A2F; margin-bottom:6px;">{title}</h3>
             <p style="color:#0A1A2F;">{summary}</p>
             <p><strong>Keywords:</strong> {keywords}</p>
-            <a href="{url}" target="_blank" style="color:#0A65FF; font-weight:600;">
-                Read Full Article →
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
