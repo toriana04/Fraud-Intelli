@@ -19,7 +19,7 @@ inject_light_ui()
 sidebar_logo()
 
 # ---------------------------------------------
-# HEADER
+# HEADER HERO
 # ---------------------------------------------
 st.markdown("""
 <div style="
@@ -40,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------
-# LOAD DATA FROM SUPABASE
+# LOAD DATA
 # ---------------------------------------------
 @st.cache_data
 def load_data():
@@ -55,6 +55,7 @@ def load_data():
             return eval(x)
         except:
             return []
+
     df["keywords"] = df["keywords"].apply(ensure_list)
 
     return df
@@ -68,9 +69,8 @@ all_keywords = [kw for lst in df["keywords"] for kw in lst]
 keyword_freq = pd.Series(all_keywords).value_counts().reset_index()
 keyword_freq.columns = ["keyword", "count"]
 
-
 # =====================================================
-# SECTION 0 — TOP FRAUD KEYWORDS (MOVED TO TOP)
+# SECTION 0 — TOP FRAUD KEYWORDS (AT TOP)
 # =====================================================
 st.subheader("🏆 Top Fraud Keywords")
 st.markdown("""
@@ -96,7 +96,6 @@ for _, row in keyword_freq.head(10).iterrows():
     </div>
     """, unsafe_allow_html=True)
 
-
 # =====================================================
 # SECTION 1 — HEATMAP (DAY vs HOUR)
 # =====================================================
@@ -121,7 +120,6 @@ sns.heatmap(heatmap_data, cmap="Blues", linewidths=.5, ax=ax)
 ax.set_title("Fraud Mentions by Day & Hour")
 st.pyplot(fig)
 
-
 # =====================================================
 # SECTION 2 — KEYWORD BAR CHART
 # =====================================================
@@ -140,9 +138,8 @@ bar_chart = (
 
 st.altair_chart(bar_chart, use_container_width=True)
 
-
 # =====================================================
-# SECTION 3 — INTERACTIVE NETWORK GRAPH (PyVis)
+# SECTION 3 — INTERACTIVE KEYWORD NETWORK (PyVis)
 # =====================================================
 st.subheader("🕸️ Interactive Keyword Network")
 st.markdown("""
@@ -162,5 +159,44 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
+# Filter weak edges
 MIN_EDGE_WEIGHT = 3
-filtered_pairs_
+filtered_pairs = {pair: count for pair, count in pair_counts.items() if count >= MIN_EDGE_WEIGHT}
+
+if not filtered_pairs:
+    st.warning("Not enough strong keyword relationships to build a network.")
+else:
+    net = Network(height="650px", width="100%", bgcolor="#FFFFFF", font_color="#0A1A2F")
+    net.barnes_hut()
+
+    keyword_freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
+
+    for kw, freq in keyword_freq_map.items():
+        if freq > 1:
+            net.add_node(
+                kw,
+                label=kw,
+                size=min(freq * 2, 40),
+                color="#0A65FF"
+            )
+
+    for (a, b), weight in filtered_pairs.items():
+        net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
+
+    net.save_graph("keyword_network.html")
+    HtmlFile = open("keyword_network.html", "r", encoding="utf-8")
+    components.html(HtmlFile.read(), height=650, scrolling=True)
+
+# =====================================================
+# SECTION 4 — FULL FRAUD KEYWORD LIST (TABLE)
+# =====================================================
+st.subheader("📚 Full Fraud Keyword List")
+st.markdown("<p style='color:#0A1A2F;'>Search, explore, and analyze all fraud-related keywords.</p>", unsafe_allow_html=True)
+
+search_term = st.text_input("Search keywords:")
+
+filtered_table = keyword_freq.copy()
+if search_term:
+    filtered_table = filtered_table[filtered_table["keyword"].str.contains(search_term, case=False)]
+
+st.dataframe(filtered_table, use_container_width=True)
