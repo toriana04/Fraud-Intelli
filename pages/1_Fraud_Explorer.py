@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-from intellifraud_ui import inject_light_ui, sidebar_logo
-
-# NEW — load live data from Supabase instead of local CSV
+from intellifraud_ui import inject_light_ui
 from load_data_supabase import load_fraud_data
 
 
@@ -24,48 +22,55 @@ st.markdown(
 
 
 # ------------------------------------------------------------
-# CUSTOM CSS — Dropdown styling
+# CUSTOM CSS — Light Gray Selectbox Styling
 # ------------------------------------------------------------
 st.markdown("""
 <style>
-/* Selectbox wrapper */
+
+/* Selectbox main input box */
 .stSelectbox > div > div {
-    background-color: #F3F4F6 !important;
+    background-color: #F8F9FA !important;  /* Very light gray */
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
-    padding: 6px !important;
+    padding: 8px !important;
 }
 
 /* Selected text */
 .stSelectbox div[data-baseweb="select"] div[class*="singleValue"] {
-    color: #0A1A2F !important;
+    color: #000000 !important;   /* Black text */
     font-size: 15px !important;
     font-weight: 500 !important;
 }
 
 /* Placeholder text */
 .stSelectbox div[data-baseweb="select"] div[class*="placeholder"] {
-    color: #0A1A2F !important;
-    opacity: 0.7 !important;
-    font-size: 15px !important;
+    color: #000000 !important;   /* Black text */
+    opacity: 0.6 !important;
 }
 
-/* Dropdown menu text */
+/* Dropdown background */
+.stSelectbox div[data-baseweb="popover"] {
+    background-color: #F8F9FA !important;
+    border-radius: 8px !important;
+}
+
+/* Dropdown option text */
 .stSelectbox div[data-baseweb="popover"] div[role="option"] {
-    color: #0A1A2F !important;
-    font-size: 15px !important;
+    color: #000000 !important;
+    background-color: #F8F9FA !important;
 }
 
 /* Hover option */
 .stSelectbox div[data-baseweb="popover"] div[role="option"]:hover {
-    background-color: #E6EAF0 !important;
+    background-color: #E1E5EA !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------
-# LOAD DATA (Supabase)
+# LOAD DATA FROM SUPABASE
 # ------------------------------------------------------------
 @st.cache_data
 def load_data():
@@ -84,8 +89,8 @@ FRAUD_CATEGORIES = {
         "invest ai", "ai trading", "ai investment"
     ],
     "Financial Fraud": [
-        "financial fraud", "financial scam", "fraud recovering", "fraud awareness",
-        "fraud specialists", "fraud trends"
+        "financial fraud", "financial scam", "fraud recovering",
+        "fraud awareness", "fraud specialists", "fraud trends"
     ],
     "Cyber & AI Fraud": [
         "genai fraud", "accounts genai", "computer fraudsters",
@@ -105,6 +110,7 @@ FRAUD_CATEGORIES = {
     ],
 }
 
+# Normalize keywords
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
