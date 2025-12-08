@@ -1,6 +1,12 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import matplotlib.pyplot as plt
+import seaborn as sns
+import itertools
+import ast
+import networkx as nx
+
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
 # NEW — load data from Supabase instead of a local CSV
@@ -41,11 +47,18 @@ st.markdown("""
 def load_data():
     df = load_fraud_data()
 
-    # Ensure timestamp column parses correctly
+    # Ensure timestamp parses correctly
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    # Ensure keyword lists are parsed
-    df["keywords"] = df["keywords"].apply(lambda x: x if isinstance(x, list) else [])
+    # Ensure keywords are lists
+    def safe_list(x):
+        if isinstance(x, list):
+            return x
+        try:
+            return ast.literal_eval(x)
+        except:
+            return []
+    df["keywords"] = df["keywords"].apply(safe_list)
 
     return df
 
@@ -61,11 +74,10 @@ keyword_freq = (
     .value_counts()
     .reset_index()
 )
-
 keyword_freq.columns = ["keyword", "count"]
 
 # ---------------------------------------------
-# SECTION 0 — TOP KEYWORDS (Light Mode Cards)
+# SECTION 0 — TOP KEYWORDS
 # ---------------------------------------------
 st.subheader("🏆 Top Fraud Keywords")
 st.markdown("""
@@ -121,6 +133,32 @@ line_chart = (
 st.altair_chart(line_chart, use_container_width=True)
 
 # ---------------------------------------------
+# SECTION 1.5 — HEATMAP (NEW)
+# ---------------------------------------------
+st.subheader("🔥 Fraud Mentions Heatmap (Day vs Hour)")
+st.markdown("""
+<p style='color:#0A1A2F;'>Patterns of fraud-related activity by day of week and hour.</p>
+""", unsafe_allow_html=True)
+
+df["day_of_week"] = df["timestamp"].dt.day_name()
+df["hour"] = df["timestamp"].dt.hour
+
+heatmap_data = df.pivot_table(
+    index="day_of_week",
+    columns="hour",
+    values="title",
+    aggfunc="count"
+).fillna(0)
+
+ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+heatmap_data = heatmap_data.reindex(ordered_days)
+
+fig, ax = plt.subplots(figsize=(14, 6))
+sns.heatmap(heatmap_data, cmap="Blues", linewidths=.5, ax=ax)
+ax.set_title("Fraud Mentions by Day and Hour")
+st.pyplot(fig)
+
+# ---------------------------------------------
 # SECTION 2 — Keyword Frequency Bar Chart
 # ---------------------------------------------
 st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
@@ -139,7 +177,48 @@ bar_chart = (
 st.altair_chart(bar_chart, use_container_width=True)
 
 # ---------------------------------------------
-# SECTION 3 — Full Keyword List (Light Mode Cards)
+# SECTION 2.5 — KEYWORD NETWORK GRAPH (NEW)
+# ---------------------------------------------
+st.subheader("🕸️ Keyword Co-Occurrence Network Graph")
+st.markdown("""
+<p style='color:#0A1A2F;'>Relationships between fraud keywords based on co-occurrence patterns.</p>
+""", unsafe_allow_html=True)
+
+# Generate keyword pairs
+pairs = []
+for kw_list in df["keywords"]:
+    if len(kw_list) > 1:
+        combos = itertools.combinations(kw_list, 2)
+        pairs.extend(combos)
+
+# Count frequencies
+pair_counts = {}
+for a, b in pairs:
+    pair = tuple(sorted([a, b]))
+    pair_counts[pair] = pair_counts.get(pair, 0) + 1
+
+# Build graph
+G = nx.Graph()
+for (a, b), weight in pair_counts.items():
+    if weight >= 2:  # threshold to reduce noise
+        G.add_edge(a, b, weight=weight)
+
+fig2, ax2 = plt.subplots(figsize=(10, 8))
+pos = nx.spring_layout(G, k=0.4, seed=42)
+
+node_sizes = [800 + (300 * G.degree(n)) for n in G.nodes()]
+
+nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color="skyblue")
+nx.draw_networkx_edges(G, pos, width=1.5, alpha=0.7)
+nx.draw_networkx_labels(G, pos, font_size=10)
+
+plt.title("Keyword Co-Occurrence Network")
+plt.axis("off")
+
+st.pyplot(fig2)
+
+# ---------------------------------------------
+# SECTION 3 — Full Keyword List
 # ---------------------------------------------
 st.subheader("📖 Full Fraud Keyword List")
 
