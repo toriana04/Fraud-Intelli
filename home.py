@@ -5,13 +5,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from datetime import datetime
 
 from intellifraud_ui import inject_light_ui
-from load_data_supabase import load_fraud_data   # ⭐ RESTORED SUPABASE IMPORT
+from load_data_supabase import load_fraud_data
 
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 inject_light_ui()
 
 # -------------------------------------------------
-# SEARCH BAR + CARD CSS
+# CSS FIXES (search bar, buttons, cards)
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -29,6 +29,24 @@ st.markdown("""
 .stTextInput input {
     color: #0A1A2F !important;
     font-size: 15px !important;
+}
+
+/* Fix black buttons */
+div.stButton > button,
+div.stDownloadButton > button {
+    background-color: #F4F5F7 !important;
+    color: #0A1A2F !important;
+    border: 1px solid #D0D7E2 !important;
+    padding: 8px 20px !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+}
+
+div.stButton > button:hover,
+div.stDownloadButton > button:hover {
+    background-color: #E6EAF0 !important;
+    border-color: #0A65FF !important;
+    color: #0A65FF !important;
 }
 
 .card {
@@ -57,23 +75,34 @@ st.markdown("""
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
+st.markdown("""
+<div class="card" style="padding:25px; margin-bottom:20px;">
+    <h1 style="margin-bottom: 5px;">🔍 Welcome to IntelliFraud</h1>
+    <p style="font-size:17px;">
+        Explore fraud trends, regulatory actions, keyword signals, and investigative insights —
+        all in one intelligent dashboard.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # -------------------------------------------------
-# LOAD DATA FROM SUPABASE (REAL SOURCE)
+# LOAD DATA FROM SUPABASE (correct source)
 # -------------------------------------------------
 @st.cache_data
 def load_articles():
-    df = load_fraud_data()   # ⭐ REAL DATA BACK
+    df = load_fraud_data()
 
-    # Normalize column names
+    # Standardize columns
     df.columns = [c.lower() for c in df.columns]
 
-    # Ensure required fields exist
     for col in ["title", "summary", "keywords", "url"]:
         if col not in df.columns:
             df[col] = ""
 
-    # Handle keywords that may come as lists OR strings
+    # Ensure clean keywords text
     def clean_kw(x):
         if isinstance(x, list):
             return ", ".join(x)
@@ -83,7 +112,7 @@ def load_articles():
     df["summary"] = df["summary"].fillna("")
     df["title"] = df["title"].fillna("Untitled Article")
 
-    # Build TF-IDF search text
+    # Build text for TF-IDF
     df["search_text"] = (
         df["title"] + " " + df["summary"] + " " + df["keywords"]
     ).str.lower()
@@ -102,7 +131,6 @@ def build_tfidf(df):
     return vectorizer, matrix
 
 vectorizer, tfidf_matrix = build_tfidf(df)
-
 
 # -------------------------------------------------
 # SAFE ARTICLE MATCH FUNCTION
@@ -123,21 +151,6 @@ def best_article_match(query):
 
     return df.iloc[idx], float(scores[idx]), scores
 
-
-# -------------------------------------------------
-# HEADER SECTION
-# -------------------------------------------------
-st.markdown("""
-<div class="card" style="padding:25px; margin-bottom:20px;">
-    <h1 style="margin-bottom: 5px;">🔍 Welcome to IntelliFraud</h1>
-    <p style="font-size:17px;">
-        Explore fraud trends, regulatory actions, keyword signals, and investigative insights —
-        all in one intelligent dashboard.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-
 # -------------------------------------------------
 # SEARCH BAR
 # -------------------------------------------------
@@ -148,9 +161,8 @@ query = st.text_input(
     placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'..."
 )
 
-
 # -------------------------------------------------
-# EXECUTE SEARCH
+# PROCESS SEARCH
 # -------------------------------------------------
 if query:
     article, score, score_list = best_article_match(query)
@@ -158,7 +170,6 @@ if query:
     if article is None:
         st.error("⚠️ No matching results found. Try different keywords.")
     else:
-        # Save history
         st.session_state["search_history"].append({
             "query": query,
             "article_title": article["title"],
@@ -168,7 +179,7 @@ if query:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
-        # Show top match
+        # MAIN ARTICLE CARD
         st.markdown(f"""
         <div class="card">
             <h3>{article['title']}</h3>
@@ -179,9 +190,8 @@ if query:
         </div>
         """, unsafe_allow_html=True)
 
-        # Related articles
+        # RELATED ARTICLES
         st.subheader("📌 Related Articles")
-
         base_kw = set(article["keywords"].lower().replace(",", "").split())
         ranked = score_list.argsort()[::-1][1:20]
 
@@ -205,9 +215,8 @@ if query:
                 </div>
                 """, unsafe_allow_html=True)
 
-
 # -------------------------------------------------
-# SEARCH HISTORY
+# SEARCH HISTORY + DOWNLOAD CSV
 # -------------------------------------------------
 st.subheader("📝 Your Search History")
 
@@ -216,20 +225,29 @@ if st.button("Clear Search History"):
     st.rerun()
 
 if st.session_state["search_history"]:
-    st.dataframe(pd.DataFrame(st.session_state["search_history"]), use_container_width=True)
+    hist_df = pd.DataFrame(st.session_state["search_history"])
+    st.dataframe(hist_df, use_container_width=True)
+
+    # ⭐ DOWNLOAD BUTTON (NEW)
+    csv_data = hist_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="⬇️ Download Search History CSV",
+        data=csv_data,
+        file_name="intellifraud_search_history.csv",
+        mime="text/csv",
+    )
 else:
     st.info("No searches yet.")
 
-
 # -------------------------------------------------
-# SIMILARITY EXPLANATION (HTML FIXED)
+# FIXED SIMILARITY EXPLANATION (HTML rendered)
 # -------------------------------------------------
 st.markdown("""
 <div class="card">
-    <h3>📈 Understanding Similarity Scores</h3>
+    <h3 style="margin-top:0;">📈 Understanding Similarity Scores</h3>
     <p>Similarity scores measure how closely your query aligns with article text using TF-IDF + cosine similarity.</p>
 
-    <ul>
+    <ul style="color:#0A1A2F; font-size:15px;">
         <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
         <li><strong>0.60 – 0.79:</strong> Strong match</li>
         <li><strong>0.40 – 0.59:</strong> Moderate match</li>
