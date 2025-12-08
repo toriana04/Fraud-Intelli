@@ -4,13 +4,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
+from load_data_supabase import load_fraud_data  # NEW
+
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 
 inject_light_ui()
 sidebar_logo()
 
 # ----------------------------------------------
-# Search history state
+# Search history
 # ----------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
@@ -29,12 +31,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------
-# Load article data
+# Load Data (Supabase)
 # ----------------------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fraud_analysis_final.csv")
-    df["keywords_clean"] = df["keywords"].fillna("").astype(str)
+    df = load_fraud_data()
+    df["keywords_clean"] = df["keywords"].astype(str)
     df["search_text"] = (
         df["title"].fillna("") + " " +
         df["summary"].fillna("") + " " +
@@ -75,7 +77,6 @@ query = st.text_input(
 )
 
 if query:
-    # Get match results
     article, score, score_list = best_article_match(query)
 
     st.session_state["search_history"].append({
@@ -86,7 +87,6 @@ if query:
         "url": article["url"],
     })
 
-    # Top match card
     st.markdown(f"""
     <div class="card">
         <h3>{article['title']}</h3>
@@ -97,17 +97,18 @@ if query:
     </div>
     """, unsafe_allow_html=True)
 
-    # Related articles
+    # ----------------------------------------------
+    # Related Articles
+    # ----------------------------------------------
     st.subheader("📌 Related Articles")
 
-    top_keywords = set(article["keywords"].lower().replace(",", "").split())
+    top_keywords = set(article["keywords"])
     ranked = score_list.argsort()[::-1][1:15]
 
     shown = 0
     for idx in ranked:
         row = df.iloc[idx]
-        row_keywords = set(row["keywords"].lower().replace(",", "").split())
-        overlap = top_keywords & row_keywords
+        overlap = top_keywords & set(row["keywords"])
 
         if len(overlap) >= 2:
             shown += 1
@@ -160,20 +161,3 @@ if not st.session_state["search_history"]:
 else:
     hist_df = pd.DataFrame(st.session_state["search_history"])
     st.dataframe(hist_df, use_container_width=True)
-
-# ----------------------------------------------
-# Explanation Card
-# ----------------------------------------------
-st.markdown("""
-<div class="card">
-    <h3>📈 Understanding Similarity Scores</h3>
-    <p>Similarity scores measure how closely your query matches article summaries using TF-IDF + cosine similarity.</p>
-
-    <ul>
-        <li><strong>0.80 – 1.00:</strong> Extremely strong match</li>
-        <li><strong>0.60 – 0.79:</strong> Strong match</li>
-        <li><strong>0.40 – 0.59:</strong> Moderate match</li>
-        <li><strong>0.00 – 0.39:</strong> Weak match</li>
-    </ul>
-</div>
-""", unsafe_allow_html=True)
