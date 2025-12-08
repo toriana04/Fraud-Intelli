@@ -3,14 +3,15 @@ import pandas as pd
 from intellifraud_ui import inject_light_ui
 from load_data_supabase import load_fraud_data
 
-
 # ------------------------------------------------------------
 # PAGE CONFIG
 # ------------------------------------------------------------
 st.set_page_config(page_title="Fraud Explorer", layout="wide")
 inject_light_ui()
 
-# Move logo to TOP instead of sidebar
+# ------------------------------------------------------------
+# LOGO AT TOP
+# ------------------------------------------------------------
 st.markdown(
     """
     <div style="text-align:center; margin-top:10px;">
@@ -20,54 +21,59 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 # ------------------------------------------------------------
-# CUSTOM CSS — Light Gray Selectbox Styling
+# BULLET-PROOF CSS FOR VERY LIGHT GRAY SELECTBOX + BLACK TEXT
 # ------------------------------------------------------------
 st.markdown("""
 <style>
 
-/* Selectbox main input box */
-.stSelectbox > div > div {
-    background-color: #F8F9FA !important;  /* Very light gray */
+/* Full select container */
+div[data-baseweb="select"] {
+    background-color: #F8F9FA !important;
+    color: #000 !important;
     border-radius: 10px !important;
     border: 1px solid #D1D5DB !important;
-    padding: 8px !important;
 }
 
-/* Selected text */
-.stSelectbox div[data-baseweb="select"] div[class*="singleValue"] {
-    color: #000000 !important;   /* Black text */
-    font-size: 15px !important;
-    font-weight: 500 !important;
+/* Outer wrapper (ensures background stays gray) */
+.stSelectbox > div {
+    background-color: #F8F9FA !important;
 }
 
 /* Placeholder text */
-.stSelectbox div[data-baseweb="select"] div[class*="placeholder"] {
-    color: #000000 !important;   /* Black text */
-    opacity: 0.6 !important;
+div[data-baseweb="select"] .css-1wa3eu0-placeholder,
+div[data-baseweb="select"] div[class*="placeholder"] {
+    color: #000 !important;
+    opacity: 0.7 !important;
 }
 
-/* Dropdown background */
-.stSelectbox div[data-baseweb="popover"] {
+/* Selected value text */
+div[data-baseweb="select"] .css-1uccc91-singleValue,
+div[data-baseweb="select"] div[class*="singleValue"] {
+    color: #000 !important;
+    opacity: 1 !important;
+}
+
+/* Dropdown menu background */
+ul[role="listbox"] {
     background-color: #F8F9FA !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
 }
 
 /* Dropdown option text */
-.stSelectbox div[data-baseweb="popover"] div[role="option"] {
-    color: #000000 !important;
+ul[role="listbox"] li {
+    color: #000 !important;
     background-color: #F8F9FA !important;
 }
 
-/* Hover option */
-.stSelectbox div[data-baseweb="popover"] div[role="option"]:hover {
+/* Hover behavior */
+ul[role="listbox"] li:hover {
     background-color: #E1E5EA !important;
+    color: #000 !important;
 }
 
 </style>
 """, unsafe_allow_html=True)
-
 
 # ------------------------------------------------------------
 # LOAD DATA FROM SUPABASE
@@ -78,7 +84,6 @@ def load_data():
     return df
 
 df = load_data()
-
 
 # ------------------------------------------------------------
 # FRAUD CATEGORIES
@@ -114,12 +119,10 @@ FRAUD_CATEGORIES = {
 for cat in FRAUD_CATEGORIES:
     FRAUD_CATEGORIES[cat] = [kw.lower() for kw in FRAUD_CATEGORIES[cat]]
 
-
 # ------------------------------------------------------------
 # MATCHING FUNCTIONS
 # ------------------------------------------------------------
 def match_score(article_keywords, category_keywords):
-    """Return count of matching keywords."""
     score = 0
     for a_kw in article_keywords:
         for c_kw in category_keywords:
@@ -127,9 +130,7 @@ def match_score(article_keywords, category_keywords):
                 score += 1
     return score
 
-
 def get_articles(category_name):
-    """Return all matching articles sorted by relevance."""
     cat_keywords = FRAUD_CATEGORIES[category_name]
     results = []
 
@@ -142,7 +143,6 @@ def get_articles(category_name):
 
     results.sort(key=lambda x: x[0], reverse=True)
     return [row for score, row in results]
-
 
 # ------------------------------------------------------------
 # HEADER
@@ -162,7 +162,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
 # ------------------------------------------------------------
 # CATEGORY PICKER
 # ------------------------------------------------------------
@@ -177,7 +176,6 @@ st.markdown(
     f"<h2 style='color:#0A65FF; margin-top:15px;'>📂 {selected_category}</h2>",
     unsafe_allow_html=True
 )
-
 
 # ------------------------------------------------------------
 # DISPLAY MATCHING ARTICLES
