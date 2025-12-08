@@ -27,13 +27,13 @@ st.markdown("""
     border: 1px solid #D1D5DB !important;
 }
 
-/* Placeholder text black */
+/* Black placeholder */
 .stTextInput input::placeholder {
-    color: #000000 !important;
+    color: #000 !important;
     opacity: 1 !important;
 }
 
-/* Actual text */
+/* Typed text */
 .stTextInput input {
     color: #0A1A2F !important;
     font-size: 15px !important;
@@ -59,7 +59,6 @@ div.stDownloadButton > button:hover {
 /* Bullet list visibility */
 ul li {
     color: #0A1A2F !important;
-    font-size: 15px !important;
 }
 
 </style>
@@ -81,28 +80,21 @@ df = load_fraud_data()
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # ---------------------------------------------------------
-# ROOT-BASED SEARCH HISTORY SYSTEM
+# SEARCH HISTORY STATE
 # ---------------------------------------------------------
-HISTORY_FILE = "search_history.csv"
+if "search_history" not in st.session_state:
+    st.session_state["search_history"] = []
 
-def load_history():
-    if os.path.exists(HISTORY_FILE):
-        return pd.read_csv(HISTORY_FILE)
-    return pd.DataFrame(columns=["query", "top_title", "similarity", "timestamp"])
-
-def save_history(entry):
-    history_df = load_history()
-    history_df = pd.concat([history_df, pd.DataFrame([entry])], ignore_index=True)
-    history_df.to_csv(HISTORY_FILE, index=False)
 
 # ---------------------------------------------------------
 # SEARCH BAR
 # ---------------------------------------------------------
 query = st.text_input(
     "🔍 Search IntelliFraud Database",
-    placeholder="Search for fraud topics, schemes, keywords, or summaries...",
-    key="search_input"
+    placeholder="Search for fraud topics, keywords, or summaries...",
+    key="home_search"
 )
+
 
 # ---------------------------------------------------------
 # SEARCH FUNCTION
@@ -118,26 +110,26 @@ def search_articles(query):
     df["similarity"] = sims
 
     top_row = df.sort_values("similarity", ascending=False).iloc[0]
-
-    # Create new entry
-    entry = {
-        "query": query,
-        "top_title": top_row["title"],
-        "similarity": float(top_row["similarity"]),
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    save_history(entry)
-
     return top_row, df.sort_values("similarity", ascending=False).head(5)
 
+
 # ---------------------------------------------------------
-# SHOW SEARCH RESULTS
+# SHOW SEARCH RESULTS + SAVE HISTORY
 # ---------------------------------------------------------
 if query and query.strip() != "":
     top_result, top5 = search_articles(query)
 
     if top_result is not None:
+
+        # ⭐⭐ FIXED: SAVE SEARCH HISTORY HERE ⭐⭐
+        st.session_state["search_history"].append({
+            "query": query,
+            "top_title": top_result["title"],
+            "similarity": float(top_result["similarity"]),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+        # Display result
         st.markdown("---")
         st.subheader("⭐ Top Matching Article")
 
@@ -150,10 +142,11 @@ if query and query.strip() != "":
             box-shadow:0 1px 4px rgba(0,0,0,0.05);
         ">
             <h3 style="color:#0A65FF;">{top_result['title']}</h3>
-            <p style="color:#0A1A2F; font-size:15px;">{top_result['summary']}</p>
+            <p style="color:#0A1A2F;">{top_result['summary']}</p>
             <p><strong>Similarity:</strong> {top_result['similarity']:.3f}</p>
         </div>
         """, unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------
 # NAVIGATION
@@ -174,42 +167,47 @@ with col3:
     if st.button("📚 Keyword Explorer"):
         st.switch_page("pages/3_Keyword Explorer.py")
 
+
 # ---------------------------------------------------------
-# DOWNLOAD + CLEAR HISTORY
+# DOWNLOAD & CLEAR SEARCH HISTORY
 # ---------------------------------------------------------
 st.markdown("---")
 st.subheader("📥 Download Your Search History")
 
-history_df = load_history()
+if len(st.session_state["search_history"]) > 0:
 
-if len(history_df) > 0:
-    csv = history_df.to_csv(index=False).encode("utf-8")
-    
+    hist_df = pd.DataFrame(st.session_state["search_history"])
+    csv = hist_df.to_csv(index=False).encode("utf-8")
+
     st.download_button(
         label="⬇️ Download Search History as CSV",
         data=csv,
-        file_name="search_history.csv",
+        file_name="intellifraud_search_history.csv",
         mime="text/csv",
-        key="download_btn"
+        key="download_history"
     )
 else:
     st.info("No search history yet.")
 
+
 if st.button("❌ Clear Search History"):
-    if os.path.exists(HISTORY_FILE):
-        os.remove(HISTORY_FILE)
+    st.session_state["search_history"] = []
     st.success("Search history cleared.")
 
+
 # ---------------------------------------------------------
-# SIMILARITY EXPLANATION
+# SIMILARITY SCORE EXPLANATION
 # ---------------------------------------------------------
 st.markdown("---")
 st.markdown("""
 ### ❓ How Similarity Scores Work
-Similarity scores measure your search text against article summaries using embeddings.
+
+Similarity scores measure how closely your search matches each article using semantic embeddings.
 
 - **0.85 – 1.00 → Extremely relevant**  
 - **0.70 – 0.85 → Strongly relevant**  
 - **0.50 – 0.70 → Moderately relevant**  
 - **Below 0.50 → Weak match**
+
+IntelliFraud uses a transformer model (MiniLM) to compute similarity between your search and article summaries.
 """)
