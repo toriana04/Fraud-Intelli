@@ -6,7 +6,18 @@ from intellifraud_ui import inject_light_ui, sidebar_logo
 # ------------------------------------------------------
 st.set_page_config(page_title="About IntelliFraud", layout="wide")
 inject_light_ui()
-sidebar_logo()
+
+# ------------------------------------------------------
+# LOGO AT THE TOP
+# ------------------------------------------------------
+sidebar_logo()  # keeps logo in sidebar
+
+# Add logo centered at the top of the page (main area)
+st.markdown("""
+<div style="text-align:center; margin-top:10px; margin-bottom:20px;">
+    <img src="https://i.imgur.com/lAVJ7Vx.png" style="width:200px;">
+</div>
+""", unsafe_allow_html=True)
 
 # ------------------------------------------------------
 # HEADER HERO
@@ -27,7 +38,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# ABOUT SECTION (Light Mode Card)
+# ABOUT SECTION (Clean, No HTML Showing)
 # ------------------------------------------------------
 st.markdown("""
 <div style="
@@ -39,13 +50,16 @@ st.markdown("""
     line-height:1.6;
 ">
     <p style="font-size:18px; color:#0A1A2F;">
-        <strong style="color:#0A65FF;">IntelliFraud</strong> is an interactive fraud intelligence dashboard designed to help users explore 
-        regulatory enforcement actions, fraud trends, keyword signals, and investigative insights.
+        <strong style="color:#0A65FF;">IntelliFraud</strong> is an interactive fraud-intelligence platform built to surface emerging
+        fraud patterns, regulatory enforcement activity, keyword signals, and risk indicators.
+        It provides a streamlined, data-driven environment for analysts, researchers, and stakeholders
+        to explore trends across financial and cyber fraud.
     </p>
 
     <p style="font-size:18px; color:#0A1A2F;">
-        This dashboard is powered by publicly available data such as FINRA enforcement actions 
-        and built using <strong>Python</strong>, <strong>Streamlit</strong>, and modern data science workflows.
+        The platform is powered by publicly available sources—including FINRA enforcement data—and uses
+        modern data science workflows built with <strong>Python</strong>, <strong>Streamlit</strong>, and <strong>Supabase</strong>.
+        IntelliFraud supports live search, pattern detection, keyword analytics, and automated insights.
     </p>
 
     <p style="font-size:18px; color:#0A1A2F;">
@@ -56,12 +70,14 @@ st.markdown("""
         <strong>Tori-Ana McNeil</strong>, 
         in collaboration with the 
         <strong>UNC Charlotte School of Data Science</strong> and <strong>USAA</strong>.
+        The project demonstrates real-world applications of data science, AI-driven investigation,
+        and responsible financial analysis.
     </p>
 </div>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# OPTIONAL FOOTER
+# FOOTER
 # ------------------------------------------------------
 st.markdown("""
 <div style="
