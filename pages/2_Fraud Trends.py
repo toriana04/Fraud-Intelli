@@ -14,7 +14,7 @@ inject_light_ui()
 sidebar_logo()
 
 # ---------------------------------------------
-# HEADER HERO (YOUR ORIGINAL)
+# HEADER HERO
 # ---------------------------------------------
 st.markdown("""
 <div style="
@@ -28,8 +28,8 @@ st.markdown("""
     <h1 style="color:#0A1A2F; margin-bottom:5px;">
         📊 Fraud Trends & Analytics
     </h1>
-    <p style="color:#4A5B6E; font-size:16px; margin-top:0;">
-        Explore top fraud patterns, keyword activity, and signals across published reports.
+    <p style="font-size:17px; color:#0A1A2F;">
+        Explore trends in regulatory enforcement, keyword activity, and historical fraud patterns.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -37,48 +37,127 @@ st.markdown("""
 # ---------------------------------------------
 # LOAD DATA FROM SUPABASE
 # ---------------------------------------------
-df = load_fraud_data()
+@st.cache_data
+def load_data():
+    df = load_fraud_data()
+
+    # Ensure timestamp column parses correctly
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+
+    # Ensure keyword lists are parsed
+    df["keywords"] = df["keywords"].apply(lambda x: x if isinstance(x, list) else [])
+
+    return df
+
+df = load_data()
 
 # ---------------------------------------------
-# TOP FRAUD KEYWORDS — ORIGINAL VERSION
+# EXTRACT & COUNT KEYWORDS
 # ---------------------------------------------
-st.subheader("🔑 Top Fraud Keywords")
+all_keywords = [kw for lst in df["keywords"] for kw in lst]
 
-keyword_counts = (
-    df["keywords"]
-        .str.split(",")
-        .explode()
-        .str.strip()
-        .value_counts()
-        .reset_index()
-)
-keyword_counts.columns = ["Keyword", "Count"]
-
-chart = (
-    alt.Chart(keyword_counts[:20])
-        .mark_bar()
-        .encode(
-            x=alt.X("Count:Q", title="Frequency"),
-            y=alt.Y("Keyword:N", sort="-x", title="Keyword")
-        )
-        .properties(height=450)
+keyword_freq = (
+    pd.Series(all_keywords)
+    .value_counts()
+    .reset_index()
 )
 
-st.altair_chart(chart, use_container_width=True)
+keyword_freq.columns = ["keyword", "count"]
 
 # ---------------------------------------------
-# FULL KEYWORD LIST — ORIGINAL VERSION
+# SECTION 0 — TOP KEYWORDS (Light Mode Cards)
 # ---------------------------------------------
-st.subheader("📄 Full Fraud Keyword List")
+st.subheader("🏆 Top Fraud Keywords")
+st.markdown("""
+<p style='font-size:16px; margin-top:-10px; color:#0A1A2F;'>
+A snapshot of the most common fraud-related keywords appearing across enforcement articles.
+</p>
+""", unsafe_allow_html=True)
 
-all_keywords = (
-    df["keywords"]
-        .str.split(",")
-        .explode()
-        .str.strip()
-        .reset_index(drop=True)
+for _, row in keyword_freq.head(10).iterrows():
+    st.markdown(f"""
+    <div style="
+        padding:14px; 
+        margin-bottom:12px; 
+        border-radius:10px; 
+        background-color:#FFFFFF; 
+        border:1px solid #E6E9EF;
+        box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    ">
+        <h3 style="color:#0A65FF; margin-bottom:4px;">{row['keyword'].capitalize()}</h3>
+        <p style="font-size:15px; margin:0; color:#0A1A2F;">
+            <strong>Frequency:</strong> {row['count']}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------------------------------------
+# SECTION 1 — Articles Published Over Time
+# ---------------------------------------------
+st.subheader("📅 Articles Published Over Time")
+st.markdown("""
+<p style='color:#0A1A2F;'>A month-by-month view of regulatory enforcement activity.</p>
+""", unsafe_allow_html=True)
+
+monthly = (
+    df.groupby(df["timestamp"].dt.to_period("M"))
+      .size()
+      .reset_index(name="count")
 )
 
-full_keyword_df = pd.DataFrame({"Keyword": all_keywords})
+monthly["timestamp"] = monthly["timestamp"].astype(str)
 
-st.dataframe(full_keyword_df, use_container_width=True)
+line_chart = (
+    alt.Chart(monthly)
+    .mark_line(point=True, color="#0A65FF")
+    .encode(
+        x=alt.X("timestamp:N", title="Month"),
+        y=alt.Y("count:Q", title="Number of Articles"),
+        tooltip=["timestamp", "count"]
+    )
+    .properties(width="container", height=350)
+)
+
+st.altair_chart(line_chart, use_container_width=True)
+
+# ---------------------------------------------
+# SECTION 2 — Keyword Frequency Bar Chart
+# ---------------------------------------------
+st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
+
+bar_chart = (
+    alt.Chart(keyword_freq.head(20))
+    .mark_bar(color="#0A65FF")
+    .encode(
+        x=alt.X("count:Q", title="Frequency"),
+        y=alt.Y("keyword:N", sort="-x", title="Keyword"),
+        tooltip=["keyword", "count"]
+    )
+    .properties(height=500)
+)
+
+st.altair_chart(bar_chart, use_container_width=True)
+
+# ---------------------------------------------
+# SECTION 3 — Full Keyword List (Light Mode Cards)
+# ---------------------------------------------
+st.subheader("📖 Full Fraud Keyword List")
+
+for _, row in keyword_freq.iterrows():
+    st.markdown(f"""
+    <div style="
+        padding:14px; 
+        margin-bottom:12px; 
+        border-radius:10px; 
+        background-color:#FFFFFF; 
+        border:1px solid #E6E9EF;
+        box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    ">
+        <h3 style="color:#0A65FF; margin-bottom:4px;">
+            {row['keyword'].capitalize()}
+        </h3>
+        <p style="font-size:15px; margin:0; color:#0A1A2F;">
+            <strong>Frequency:</strong> {row['count']}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
