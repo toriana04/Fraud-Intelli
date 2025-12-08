@@ -13,6 +13,17 @@ from load_data_supabase import load_fraud_data
 # ---------------------------------------------
 st.set_page_config(page_title="Fraud Trends", layout="wide")
 inject_light_ui()
+
+# ---------------------------------------------
+# MOVE LOGO TO TOP OF PAGE
+# ---------------------------------------------
+st.markdown("""
+<div style="text-align:center; margin-top:15px; margin-bottom:20px;">
+    <img src="https://i.imgur.com/lAVJ7Vx.png" width="160" style="border-radius:12px;">
+</div>
+""", unsafe_allow_html=True)
+
+# Keep sidebar logo if you still want it there (remove if not needed)
 sidebar_logo()
 
 # ---------------------------------------------
@@ -105,17 +116,10 @@ bar_chart = (
 st.altair_chart(bar_chart, use_container_width=True)
 
 # =====================================================
-# SECTION 2 — OPTIMIZED INTERACTIVE NETWORK GRAPH
+# SECTION 2 — INTERACTIVE NETWORK GRAPH
 # =====================================================
 st.subheader("🕸️ Interactive Keyword Network (Optimized)")
 
-st.markdown("""
-<p style='color:#0A1A2F;'>
-Drag nodes • Hover for connections • Zoom to explore the fraud landscape.
-</p>
-""", unsafe_allow_html=True)
-
-# Build co-occurrence pairs
 pairs = []
 for kw_list in df["keywords"]:
     if len(kw_list) > 1:
@@ -126,7 +130,6 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-# STRONG EDGE FILTER
 MIN_EDGE_WEIGHT = 6
 filtered_pairs = {pair: c for pair, c in pair_counts.items() if c >= MIN_EDGE_WEIGHT}
 
@@ -138,7 +141,6 @@ else:
 
     freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
 
-    # Add nodes
     for kw, freq in freq_map.items():
         if freq > 2:
             net.add_node(
@@ -148,11 +150,9 @@ else:
                 color="#0A65FF"
             )
 
-    # Add edges
     for (a, b), weight in filtered_pairs.items():
         net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
 
-    # ⭐ FINAL SMOOTH-DRAG PHYSICS (NO SNAPPING)
     net.set_options("""
 {
   "nodes": {
@@ -167,10 +167,7 @@ else:
   },
   "physics": {
     "enabled": true,
-    "stabilization": {
-      "enabled": true,
-      "iterations": 150
-    },
+    "stabilization": { "iterations": 150 },
     "barnesHut": {
       "gravitationalConstant": -2500,
       "centralGravity": 0.10,
@@ -193,14 +190,35 @@ else:
     components.html(HtmlFile.read(), height=650, scrolling=True)
 
 # =====================================================
-# SECTION 3 — FULL KEYWORD TABLE
+# SECTION 3 — FULL KEYWORD TABLE WITH CUSTOM SEARCH BAR
 # =====================================================
 st.subheader("📚 Full Fraud Keyword List")
 
-search = st.text_input("Search keywords:")
-table = keyword_freq.copy()
+# --- CUSTOM SEARCH BAR STYLE (MATCHES YOUR IMAGE)
+search_html = """
+<input type="text" id="customSearch" placeholder="Enter a keyword" 
+style="
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 16px;
+    border-radius: 25px;
+    border: 1px solid #C3C7CF;
+    background-color: #F5F7FA;
+    color: #0A1A2F;
+    outline: none;
+">
+<script>
+const streamlitInput = document.getElementsByName("customSearch")[0];
+</script>
+"""
 
-if search:
-    table = table[table["keyword"].str.contains(search, case=False)]
+search_value = st.text_input(
+    "",
+    placeholder="Try: 'mail theft', 'investment fraud', 'AI trading', 'identity theft'...",
+)
+
+table = keyword_freq.copy()
+if search_value:
+    table = table[table["keyword"].str.contains(search_value, case=False)]
 
 st.dataframe(table, use_container_width=True)
