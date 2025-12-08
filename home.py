@@ -4,21 +4,25 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from intellifraud_ui import inject_light_ui, sidebar_logo
 
-from load_data_supabase import load_fraud_data  # NEW
+# NEW — load dataset from Supabase instead of local CSV
+from load_data_supabase import load_fraud_data
 
+# ----------------------------------------------
+# PAGE CONFIG & UI
+# ----------------------------------------------
 st.set_page_config(page_title="IntelliFraud Home", layout="wide")
 
 inject_light_ui()
 sidebar_logo()
 
 # ----------------------------------------------
-# Search history
+# Search history (Streamlit session state)
 # ----------------------------------------------
 if "search_history" not in st.session_state:
     st.session_state["search_history"] = []
 
 # ----------------------------------------------
-# Header Section
+# Header block
 # ----------------------------------------------
 st.markdown("""
 <div class="card" style="padding:25px; margin-bottom:20px;">
@@ -31,23 +35,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------
-# Load Data (Supabase)
+# Load Data from Supabase
 # ----------------------------------------------
 @st.cache_data
 def load_data():
     df = load_fraud_data()
+
+    # Convert keyword lists to clean strings for TF-IDF
     df["keywords_clean"] = df["keywords"].astype(str)
+
     df["search_text"] = (
         df["title"].fillna("") + " " +
         df["summary"].fillna("") + " " +
         df["keywords_clean"]
     ).str.lower()
+
     return df
 
 df = load_data()
 
 # ----------------------------------------------
-# TF-IDF Model
+# TF-IDF model
 # ----------------------------------------------
 @st.cache_resource
 def build_tfidf():
@@ -58,7 +66,7 @@ def build_tfidf():
 vectorizer, tfidf_matrix = build_tfidf()
 
 # ----------------------------------------------
-# Best match function
+# Best-match function
 # ----------------------------------------------
 def best_article_match(query):
     query_vec = vectorizer.transform([query.lower()])
@@ -77,8 +85,10 @@ query = st.text_input(
 )
 
 if query:
+    # compute match
     article, score, score_list = best_article_match(query)
 
+    # save to history
     st.session_state["search_history"].append({
         "query": query,
         "article_title": article["title"],
@@ -87,6 +97,7 @@ if query:
         "url": article["url"],
     })
 
+    # show main result
     st.markdown(f"""
     <div class="card">
         <h3>{article['title']}</h3>
@@ -98,10 +109,11 @@ if query:
     """, unsafe_allow_html=True)
 
     # ----------------------------------------------
-    # Related Articles
+    # Related articles
     # ----------------------------------------------
     st.subheader("📌 Related Articles")
 
+    # convert to sets for overlap calculations
     top_keywords = set(article["keywords"])
     ranked = score_list.argsort()[::-1][1:15]
 
@@ -110,7 +122,7 @@ if query:
         row = df.iloc[idx]
         overlap = top_keywords & set(row["keywords"])
 
-        if len(overlap) >= 2:
+        if len(overlap) >= 2:  # must share at least 2 keywords
             shown += 1
             if shown > 3:
                 break
@@ -126,7 +138,7 @@ if query:
             """, unsafe_allow_html=True)
 
 # ----------------------------------------------
-# Feature Cards
+# Feature Navigation Cards
 # ----------------------------------------------
 st.subheader("📂 Navigate IntelliFraud")
 
@@ -148,7 +160,7 @@ for col, item in zip([c1, c2, c3, c4], features):
         """, unsafe_allow_html=True)
 
 # ----------------------------------------------
-# Search History
+# Search History Section
 # ----------------------------------------------
 st.subheader("📝 Your Search History")
 
