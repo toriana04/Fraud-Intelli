@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import seaborn as sns
-import matplotlib.pyplot as plt
 import itertools
 from pyvis.network import Network
 import streamlit.components.v1 as components
@@ -46,14 +44,13 @@ def load_data():
     df = load_fraud_data()
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
-    def ensure_list(x):
-        if isinstance(x, list):
-            return x
+    def ensure_list(val):
+        if isinstance(val, list):
+            return val
         try:
-            return eval(x)
+            return eval(val)
         except:
             return []
-
     df["keywords"] = df["keywords"].apply(ensure_list)
     return df
 
@@ -67,14 +64,10 @@ keyword_freq = pd.Series(all_keywords).value_counts().reset_index()
 keyword_freq.columns = ["keyword", "count"]
 
 # =====================================================
-# SECTION 0 — TOP FRAUD KEYWORDS
+# SECTION 0 — TOP KEYWORDS
 # =====================================================
 st.subheader("🏆 Top Fraud Keywords")
-st.markdown("""
-<p style='font-size:16px; margin-top:-10px; color:#0A1A2F;'>
-A snapshot of the most common fraud-related keywords.
-</p>
-""", unsafe_allow_html=True)
+st.markdown("<p style='color:#0A1A2F;'>Most common fraud-related keywords.</p>", unsafe_allow_html=True)
 
 for _, row in keyword_freq.head(10).iterrows():
     st.markdown(f"""
@@ -94,7 +87,7 @@ for _, row in keyword_freq.head(10).iterrows():
     """, unsafe_allow_html=True)
 
 # =====================================================
-# SECTION 1 — KEYWORD BAR CHART
+# SECTION 1 — BAR CHART
 # =====================================================
 st.subheader("🔑 Most Common Fraud Keywords (Bar Chart)")
 
@@ -106,18 +99,19 @@ bar_chart = (
         y=alt.Y("keyword:N", sort="-x", title="Keyword"),
         tooltip=["keyword", "count"]
     )
-    .properties(height=500)
+    .properties(height=480)
 )
 
 st.altair_chart(bar_chart, use_container_width=True)
 
 # =====================================================
-# SECTION 2 — OPTIMIZED INTERACTIVE KEYWORD NETWORK
+# SECTION 2 — OPTIMIZED INTERACTIVE NETWORK GRAPH
 # =====================================================
 st.subheader("🕸️ Interactive Keyword Network (Optimized)")
+
 st.markdown("""
 <p style='color:#0A1A2F;'>
-Drag nodes • Hover to see connections • Zoom to explore the fraud landscape.
+Drag nodes • Hover for connections • Zoom to explore the fraud landscape.
 </p>
 """, unsafe_allow_html=True)
 
@@ -132,19 +126,20 @@ for a, b in pairs:
     pair = tuple(sorted([a, b]))
     pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-# Filter stronger edges only
+# STRONG EDGE FILTER
 MIN_EDGE_WEIGHT = 6
-filtered_pairs = {pair: count for pair, count in pair_counts.items() if count >= MIN_EDGE_WEIGHT}
+filtered_pairs = {pair: c for pair, c in pair_counts.items() if c >= MIN_EDGE_WEIGHT}
 
 if not filtered_pairs:
-    st.warning("Not enough strong keyword relationships to build a network.")
+    st.warning("Not enough keyword connections to build a network.")
 else:
     net = Network(height="650px", width="100%", bgcolor="#FFFFFF", font_color="#0A1A2F")
     net.barnes_hut()
 
-    keyword_freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
+    freq_map = dict(zip(keyword_freq["keyword"], keyword_freq["count"]))
 
-    for kw, freq in keyword_freq_map.items():
+    # Add nodes
+    for kw, freq in freq_map.items():
         if freq > 2:
             net.add_node(
                 kw,
@@ -153,10 +148,11 @@ else:
                 color="#0A65FF"
             )
 
+    # Add edges
     for (a, b), weight in filtered_pairs.items():
         net.add_edge(a, b, value=weight, title=f"Co-occurrences: {weight}")
 
-    # ⭐ FIXED JSON — valid for PyVis
+    # ⭐ FINAL SMOOTH-DRAG PHYSICS (NO SNAPPING)
     net.set_options("""
 {
   "nodes": {
@@ -171,19 +167,23 @@ else:
   },
   "physics": {
     "enabled": true,
-    "stabilization": { "iterations": 200 },
+    "stabilization": {
+      "enabled": true,
+      "iterations": 150
+    },
     "barnesHut": {
-      "gravitationalConstant": -6000,
-      "centralGravity": 0.15,
-      "springLength": 190,
-      "springConstant": 0.025,
+      "gravitationalConstant": -2500,
+      "centralGravity": 0.10,
+      "springLength": 240,
+      "springConstant": 0.010,
       "avoidOverlap": 1
     }
   },
   "interaction": {
     "hover": true,
     "zoomView": true,
-    "dragView": true
+    "dragView": true,
+    "dragNodes": true
   }
 }
 """)
@@ -193,15 +193,14 @@ else:
     components.html(HtmlFile.read(), height=650, scrolling=True)
 
 # =====================================================
-# SECTION 3 — FULL FRAUD KEYWORD LIST
+# SECTION 3 — FULL KEYWORD TABLE
 # =====================================================
 st.subheader("📚 Full Fraud Keyword List")
-st.markdown("<p style='color:#0A1A2F;'>Search, explore, and analyze all fraud-related keywords.</p>", unsafe_allow_html=True)
 
-search_term = st.text_input("Search keywords:")
-filtered_table = keyword_freq.copy()
+search = st.text_input("Search keywords:")
+table = keyword_freq.copy()
 
-if search_term:
-    filtered_table = filtered_table[filtered_table["keyword"].str.contains(search_term, case=False)]
+if search:
+    table = table[table["keyword"].str.contains(search, case=False)]
 
-st.dataframe(filtered_table, use_container_width=True)
+st.dataframe(table, use_container_width=True)
